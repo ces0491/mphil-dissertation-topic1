@@ -80,9 +80,59 @@ options(scipen = 999)
 ```
 
 ```{r wordcount, include=FALSE}
-raw_text <- readLines("fintech-dissertation-part1-stablecoins.qmd")
-body_text <- raw_text[!grepl("^---|^title:|^subtitle:|^author:|^date:|^format:|^execute:", raw_text)]
-word_count <- sum(str_count(body_text, boundary("word")))
+# Read the document content
+raw_text <- readLines(knitr::current_input())
+
+# Academic word count - exclude standard elements
+body_text <- ""
+in_code_chunk <- FALSE
+in_references <- FALSE
+skip_section <- FALSE
+
+for (i in seq_along(raw_text)) {
+  line <- trimws(raw_text[i])
+  
+  # Skip YAML header
+  if (line == "---" && i <= 50) {
+    next
+  }
+  
+  # Identify sections to exclude
+  if (line == "# Terms and Definitions") {
+    skip_section <- TRUE
+    next
+  } else if (line == "# Abstract") {
+    skip_section <- FALSE
+  } else if (line == "# References" || grepl("^[A-Z][a-z]+, [A-Z]\\.", line)) {
+    in_references <- TRUE
+    next
+  }
+  
+  # Skip code chunks
+  if (startsWith(line, "```")) {
+    in_code_chunk <- !in_code_chunk
+    next
+  }
+  
+  # Skip excluded content
+  if (in_code_chunk || in_references || skip_section) {
+    next
+  }
+  
+  # Skip metadata and captions
+  if (startsWith(line, "**Word Count:") || 
+      startsWith(line, "**Keywords:") ||
+      grepl("fig\\.cap=|caption =|Sources:|^\\*+.*\\*+$", line)) {
+    next
+  }
+  
+  # Include in body text
+  body_text <- paste(body_text, raw_text[i])
+}
+
+# Count words
+word_count <- length(unlist(strsplit(body_text, "\\s+")))
+word_count <- sum(nzchar(trimws(unlist(strsplit(body_text, "\\s+")))))
 ```
 
 **Word Count: `r word_count` words**
