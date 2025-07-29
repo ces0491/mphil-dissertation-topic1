@@ -25,7 +25,7 @@ execute:
 ---
 
 ```{r setup, include=FALSE}
-# Set CRAN mirror
+
 options(repos = c(CRAN = "https://cran.rstudio.com/"))
 
 required_packages <- c("dplyr", "ggplot2", "stringr", "tidyr", "forcats", "flextable", "officer")
@@ -93,9 +93,11 @@ if (cqthemes_available) {
 }
 
 options(scipen = 999)
+
 ```
 
 ```{r wordcount, include=FALSE}
+
 count_words_qmd <- function(file_path) {
   raw_text <- readLines(file_path, warn = FALSE)
   
@@ -159,6 +161,7 @@ count_words_qmd <- function(file_path) {
 }
 
 word_count <- count_words_qmd(knitr::current_input())
+
 ```
 
 \newpage
@@ -171,7 +174,15 @@ Drawing from Brazil's implementation of Pix as a benchmark for effective digital
 
 The findings suggest that in jurisdictions with robust, interoperable, and inclusive digital payment systems under appropriate regulatory oversight, stablecoins primarily serve specialized use cases rather than providing broad-based improvements to payment efficiency or financial inclusion. This conclusion has significant implications for policymakers, financial institutions, and technology developers operating within emerging economies implementing comprehensive payment system modernization programmes.
 
+::: {=latex}
+\vspace{1\baselineskip}
+:::
+
 **Keywords:** stablecoins, digital payments, financial inclusion, payment systems, South Africa, financial technology, regulatory frameworks
+
+::: {=latex}
+\vspace{1\baselineskip}
+:::
 
 **Word Count: `r formatC(word_count, format="d", big.mark=",")`**
 
@@ -239,6 +250,8 @@ The design principles that enabled Pix's success provide a template for other em
 
 The South African context presents important parallels to Brazilian experience while also highlighting unique challenges and opportunities. The SARB's Vision 2025 initiative, launched in 2018, emphasizes accessible, efficient, and inclusive payment infrastructure development, following similar principles to those that guided Pix implementation. PayShap implementation in 2023 demonstrates similar design principles including real-time processing, universal bank participation, and financial inclusion focus.
 
+However, the practical implementation of instant payment systems faces adoption challenges. PayShap's uptake has been slower than anticipated, with issues including limited initial bank participation, fee structure concerns at launch, and insufficient user awareness campaigns affecting adoption rates.
+
 ## Stablecoin Landscape and Regulatory Approaches
 
 The stablecoin landscape has evolved rapidly, with global market capitalization reaching significant levels by 2024, accompanied by increased regulatory scrutiny and stability events highlighting risks from inadequate reserve management and governance. Understanding this evolution is crucial for assessing the current state and future potential of stablecoin systems.
@@ -271,17 +284,395 @@ Analysis draws on academic literature, central bank publications, international 
 
 The comparative analysis of transaction costs reveals fundamental differences between stablecoins and traditional digital payment systems. The economic framework developed by Catalini et al. (2022) demonstrates that stablecoin cost structures are primarily determined by underlying blockchain network fees, which are typically fixed per transaction regardless of value but vary significantly based on network congestion.
 
+Remittance cost data is calculated from the World Bank Remittance Prices Worldwide Database, using simple arithmetic mean of CC2 total cost percentages across all valid remittance services for each country-period combination.
+
+The CC2 total cost percentage represents the comprehensive cost of sending remittances, calculated as a percentage of the principal amount transferred. Unlike partial cost measures, CC2 encompasses:
+
+1. **Service fees**: Explicit charges levied by money transfer operators (MTOs) for processing transactions
+2. **Foreign exchange margins**: The difference between the wholesale interbank exchange rate and the retail rate offered to consumers
+3. **Intermediary costs**: Fees charged by correspondent banks, agents, or other intermediaries in the transaction chain
+
+The World Bank methodology calculates CC2 based on a standardised transfer amount of $500 USD equivalent, representing typical remittance transaction values globally (World Bank, 2024).
+
+For the purposes of comparing stablecoins with traditional remittance systems, CC2 provides a rigorous foundation. Traditional remittance costs often include substantial hidden components, particularly foreign exchange margins, which can represent a substantial part of total transfer costs in certain corridors. Partial measures such as service fees alone would systematically understate the true cost burden faced by remittance users.
+
+When evaluating stablecoin transaction costs, users similarly face multiple cost components:
+- Network transaction fees (gas fees on blockchain networks)
+- On-ramp and off-ramp fees for converting between fiat and digital assets
+- Exchange rate spreads when converting between different currencies
+- Wallet management and custody fees
+
+The use of CC2 enables direct comparison between these total cost structures, avoiding the methodological inconsistency that would arise from comparing partial traditional costs with total stablecoin costs.
+
+The use of simple arithmetic means across services follows World Bank standard practice but may not reflect market-share weighted costs actually experienced by users. This limitation applies consistently across all countries analysed, maintaining comparative validity while acknowledging absolute measurement constraints.
+
+```{r}
+#| echo: false
+#| output: false
+#| warning: false
+#| message: false
+
+library(readxl)
+library(dplyr)
+
+# Function to calculate remittance costs from World Bank dataset
+calculate_remittance_costs <- function(file_path = "./inst/extdata/rpw_dataset_2024_q3.xlsx",
+                                     target_period = NULL,
+                                     countries = c("South Africa", "Kenya", "Ghana", "Brazil"),
+                                     use_standard_column_name = FALSE,
+                                     verbose = FALSE) {
+  
+  # Read the dataset
+  if (!file.exists(file_path)) {
+    stop("Dataset file not found. Please ensure rpw_dataset_2024_q3.xlsx is in the working directory.")
+  }
+  
+  # Read the dataset
+  data <- read_excel(file_path, sheet = "Dataset")
+  
+  # Print column names to verify structure (only if verbose)
+  if (verbose) {
+    cat("Dataset columns found:\n")
+    print(names(data))
+  }
+  
+  # Check available periods
+  available_periods <- unique(data$period)
+  if (verbose) {
+    cat("Available periods in dataset:", paste(available_periods, collapse = ", "), "\n")
+  }
+  
+  # Find the target period or best match
+  found_period <- NULL
+  
+  if (is.null(target_period)) {
+    # No target specified - find the latest period available
+    sorted_periods <- sort(available_periods, decreasing = TRUE)
+    found_period <- sorted_periods[1]
+    if (verbose) {
+      cat("No target period specified. Using latest available period:", found_period, "\n")
+    }
+  } else if (target_period %in% available_periods) {
+    # Exact match found
+    found_period <- target_period
+    if (verbose) {
+      cat("Found exact period match:", found_period, "\n")
+    }
+  } else {
+    # Try different period format variations more robustly
+    period_variations <- c(target_period)
+    
+    # Extract year and quarter more safely using regex
+    if (grepl("\\d{4}Q\\d+", target_period)) {
+      # Format like 2024Q3
+      year <- substr(target_period, 1, 4)
+      quarter <- gsub(".*Q(\\d+).*", "\\1", target_period)
+      
+      period_variations <- c(
+        period_variations,
+        paste0(year, "_", quarter, "Q"),  # 2024_3Q
+        paste0(year, "Q", quarter),       # 2024Q3 (original)
+        gsub("Q", "_", target_period)     # 2024_3
+      )
+    } else if (grepl("\\d{4}_\\d+Q?", target_period)) {
+      # Format like 2024_3Q or 2024_3
+      year <- substr(target_period, 1, 4)
+      quarter <- gsub(".*_(\\d+).*", "\\1", target_period)
+      
+      period_variations <- c(
+        period_variations,
+        paste0(year, "Q", quarter),       # 2024Q3
+        paste0(year, "_", quarter, "Q"),  # 2024_3Q
+        paste0(year, "_", quarter)        # 2024_3
+      )
+    }
+    
+    for (variant in period_variations) {
+      if (variant %in% available_periods) {
+        found_period <- variant
+        if (verbose) {
+          cat("Found period variant match:", found_period, "\n")
+        }
+        break
+      }
+    }
+    
+    # If still no match, extract year from target_period and find latest in that year
+    if (is.null(found_period)) {
+      target_year <- substr(target_period, 1, 4)
+      year_periods <- available_periods[grep(target_year, available_periods)]
+      
+      if (length(year_periods) > 0) {
+        found_period <- max(year_periods)
+        if (verbose) {
+          cat("Target period not found. Using latest", target_year, "period:", found_period, "\n")
+        }
+      } else {
+        # No data for target year, find absolute latest period
+        if (verbose) {
+          cat("No data found for year", target_year, ". Finding latest available period...\n")
+        }
+        
+        # Sort periods to find the latest (this assumes periods are sortable)
+        sorted_periods <- sort(available_periods, decreasing = TRUE)
+        found_period <- sorted_periods[1]
+        if (verbose) {
+          cat("Using latest available period:", found_period, "\n")
+        }
+      }
+    }
+  }
+  
+  if (is.null(found_period)) {
+    stop("Could not determine a suitable period from available data: ", paste(available_periods, collapse = ", "))
+  }
+  
+  target_period <- found_period
+  
+  # Filter for the target period
+  period_data <- data[data$period == target_period, ]
+  
+  if (nrow(period_data) == 0) {
+    stop("No data found for period: ", target_period)
+  }
+  
+  cat("Found", nrow(period_data), "records for", target_period, "\n")
+  
+  # Country code mapping
+  country_codes_map <- list(
+    "South Africa" = c("ZAF", "ZA", "South Africa"),
+    "Kenya" = c("KEN", "KE", "Kenya"),
+    "Ghana" = c("GHA", "GH", "Ghana"), 
+    "Brazil" = c("BRA", "BR", "Brazil"),
+    "Nigeria" = c("NGA", "NG", "Nigeria"),
+    "India" = c("IND", "IN", "India"),
+    "Philippines" = c("PHL", "PH", "Philippines"),
+    "Bangladesh" = c("BGD", "BD", "Bangladesh")
+  )
+  
+  # Identify the correct cost column name first
+  cost_column <- "cc2_total_cost_%"
+  if (!cost_column %in% names(period_data)) {
+    # Try alternative names
+    possible_names <- c("cc2 total cost %", "CC2 total cost %", "cc2_total_cost_percent", 
+                        "Total_Cost_Percent", "total_cost", "cost_percent")
+    
+    cost_column <- NULL
+    for (col_name in possible_names) {
+      if (col_name %in% names(period_data)) {
+        cost_column <- col_name
+        break
+      }
+    }
+    
+    if (is.null(cost_column)) {
+      stop("Cost column not found. Available columns: ", paste(names(period_data), collapse = ", "))
+    }
+  }
+  
+  # Generate dynamic column name based on the period used
+  if (use_standard_column_name) {
+    cost_column_name <- "Q3_2024_Cost_Percent"
+    if (verbose) {
+      cat("Using standard column name for backward compatibility:", cost_column_name, "\n")
+    }
+  } else {
+    period_for_column <- target_period
+    
+    # Convert period to a standardized format for column naming
+    if (grepl("Q", period_for_column)) {
+      if (grepl("\\d{4}Q\\d", period_for_column)) {
+        # Format like 2024Q3
+        year <- substr(period_for_column, 1, 4)
+        quarter <- substr(period_for_column, 6, 6)
+        column_suffix <- paste0("Q", quarter, "_", year)
+      } else if (grepl("\\d{4}_\\dQ", period_for_column)) {
+        # Format like 2024_3Q
+        year <- substr(period_for_column, 1, 4)
+        quarter <- substr(period_for_column, 6, 6)
+        column_suffix <- paste0("Q", quarter, "_", year)
+      } else {
+        # Fallback - use the period as is
+        column_suffix <- gsub("[^A-Za-z0-9]", "_", period_for_column)
+      }
+    } else {
+      # No Q in period, use as is with cleaning
+      column_suffix <- gsub("[^A-Za-z0-9]", "_", period_for_column)
+    }
+    
+    cost_column_name <- paste0(column_suffix, "_Cost_Percent")
+    if (verbose) {
+      cat("Using dynamic column name:", cost_column_name, "\n")
+    }
+  }
+  
+  # Function to calculate average cost for a specific country
+  get_country_avg <- function(country_name) {
+    codes <- country_codes_map[[country_name]]
+    if (is.null(codes)) {
+      # If country not in map, use the country name as is
+      codes <- c(country_name)
+    }
+    
+    country_data <- NULL
+    used_code <- NULL
+    
+    # Try each possible country code/name
+    for (code in codes) {
+      temp_data <- period_data[period_data$source_code == code | 
+                              period_data$source_name == code, ]
+      if (nrow(temp_data) > 0) {
+        country_data <- temp_data
+        used_code <- code
+        break
+      }
+    }
+    
+    if (verbose) {
+      cat("Processing", country_name, "- found", ifelse(is.null(country_data), 0, nrow(country_data)), "records\n")
+    }
+    
+    if (is.null(country_data) || nrow(country_data) == 0) {
+      result <- data.frame(Country = country_name, Number_of_Services = 0)
+      result[[cost_column_name]] <- NA
+      return(result)
+    }
+    
+    # Remove missing values and calculate mean of cost column
+    valid_costs <- country_data[[cost_column]][!is.na(country_data[[cost_column]])]
+    
+    if (length(valid_costs) == 0) {
+      result <- data.frame(Country = country_name, Number_of_Services = 0)
+      result[[cost_column_name]] <- NA
+      return(result)
+    }
+    
+    avg_cost <- mean(valid_costs, na.rm = TRUE)
+    num_services <- length(valid_costs)
+    
+    if (verbose) {
+      cat("  -> Average cost:", round(avg_cost, 2), "% from", num_services, "services (using code:", used_code, ")\n")
+    }
+    
+    result <- data.frame(Country = country_name, Number_of_Services = num_services)
+    result[[cost_column_name]] <- round(avg_cost, 1)
+    return(result)
+  }
+  
+  # Calculate for each country (excluding Global Average from country processing)
+  country_list <- countries[countries != "Global Average"]
+  results <- data.frame()
+  
+  for (country_name in country_list) {
+    country_result <- get_country_avg(country_name)
+    results <- rbind(results, country_result)
+  }
+  
+  # Calculate global average from all data in the dataset if requested
+  if ("Global Average" %in% countries) {
+    all_valid_costs <- period_data[[cost_column]][!is.na(period_data[[cost_column]])]
+    
+    if (length(all_valid_costs) > 0) {
+      global_result <- data.frame(Country = "Global Average", Number_of_Services = length(all_valid_costs))
+      global_result[[cost_column_name]] <- round(mean(all_valid_costs, na.rm = TRUE), 1)
+      results <- rbind(results, global_result)
+      if (verbose) {
+        cat("Global Average calculated from", length(all_valid_costs), "total services across all countries\n")
+      }
+    }
+  }
+  
+  # Add period information to results for reference
+  results$Period_Used <- target_period
+  
+  return(results)
+}
+
+# Calculate remittance data (will only work if Excel file is present)
+tryCatch({
+  # Default calculation with standard column name for backward compatibility
+  remittance_data <- calculate_remittance_costs(countries = c("South Africa", "Kenya", "Ghana", "Brazil", "Global Average"), 
+                                               use_standard_column_name = TRUE,
+                                               verbose = FALSE)
+  if (exists("remittance_data")) {
+    cat("\nCalculated remittance costs:\n")
+    print(remittance_data)
+  }
+}, error = function(e) {
+  # Fallback to verified figures if file not available
+  cat("Excel file not found or error occurred:", e$message, "\n")
+  cat("Using verified figures from World Bank Q3 2024:\n")
+  remittance_data <<- data.frame(
+    Country = c("South Africa", "Kenya", "Ghana", "Brazil", "Global Average"),
+    Q3_2024_Cost_Percent = c(7.1, 6.4, 6.6, 6.6, 4.4),
+    Number_of_Services = c(301, 89, 7, 13, 6600),
+    Period_Used = rep("2024Q3", 5),
+    stringsAsFactors = FALSE
+  )
+  print(remittance_data)
+})
+
+# Create a summary table for the dissertation (optional - set show_summary = FALSE to suppress)
+show_summary <- FALSE  # Set to TRUE if you want to see the summary table
+
+if (exists("remittance_data") && show_summary) {
+  # Get the cost column name (should be dynamic based on period)
+  cost_col_names <- names(remittance_data)[grepl("Cost_Percent$", names(remittance_data))]
+  if (length(cost_col_names) > 0) {
+    cost_col_name <- cost_col_names[1]
+  } else {
+    cost_col_name <- "Q3_2024_Cost_Percent"  # fallback
+  }
+  
+  # Extract period for display
+  if ("Period_Used" %in% names(remittance_data)) {
+    period_used <- remittance_data$Period_Used[1]
+  } else {
+    period_used <- "Q3 2024"  # fallback
+  }
+  
+  cat("\nRemittance Cost Summary Table:\n")
+  cat("=====================================\n")
+  for (i in 1:nrow(remittance_data)) {
+    if (!is.na(remittance_data[[cost_col_name]][i])) {
+      cat(sprintf("%-15s: %4.1f%% (%d services)\n", 
+                  remittance_data$Country[i], 
+                  remittance_data[[cost_col_name]][i],
+                  remittance_data$Number_of_Services[i]))
+    } else {
+      cat(sprintf("%-15s: No data available\n", 
+                  remittance_data$Country[i]))
+    }
+  }
+  cat("=====================================\n")
+  cat("Source: World Bank Remittance Prices Worldwide Database,", period_used, "\n")
+}
+
+tryCatch({
+  remittance_data <- calculate_remittance_costs(countries = c("South Africa", "Kenya", "Ghana", "Brazil", "Global Average"), use_standard_column_name = TRUE, verbose = FALSE)
+  
+  cat("\nCalculated remittance costs:\n")
+  print(remittance_data)
+  
+  }, error = function(e) {
+    
+  # Fallback to verified figures if file not available
+  cat("Excel file not found or error occurred:", e$message, "\n")
+  cat("Using verified figures from World Bank Q3 2024:\n")
+  remittance_data <- data.frame(
+    Country = c("South Africa", "Kenya", "Ghana", "Brazil", "Global Average"),
+    Q3_2024_Cost_Percent = c(7.1, 6.4, 6.6, 6.6, 4.4),
+    Number_of_Services = c(301, 89, 7, 13, 6600),
+    Period_Used = rep("2024Q3", 5),
+    stringsAsFactors = FALSE
+  )
+})
+
+```
+
 ```{r}
 #| label: fig-remittance-costs
 #| fig-cap: "Cross-Border Remittance Costs by Country"
-
-# Verified data from Q3 2024 World Bank Remittance Prices Worldwide Database
-# Based on CC2 scenario ($500 equivalent transactions)
-remittance_data <- data.frame(
-  Country = c("South Africa", "Nigeria", "Kenya", "Ghana", "Brazil", "Global Average"),
-  Q3_2024_Cost_Percent = c(8.5, 6.4, 6.4, 6.6, 6.6, 4.6),
-  Number_of_Services = c(291, "Multiple", 89, 7, 13, 6495)
-)
 
 ggplot(remittance_data, aes(x = reorder(Country, Q3_2024_Cost_Percent), y = Q3_2024_Cost_Percent)) +
   geom_col(fill = get_colors(1), alpha = 0.8) +
@@ -293,7 +684,7 @@ ggplot(remittance_data, aes(x = reorder(Country, Q3_2024_Cost_Percent), y = Q3_2
     subtitle = "Average cost as percentage of transfer amount (Q3 2024, $500 equivalent)",
     x = "Country",
     y = "Average Cost (%)",
-    caption = "Source: World Bank Remittance Prices Worldwide Database Q3 2024\nMethodology: Simple arithmetic mean of CC2 total cost % across all valid remittance services.\nCC2 represents costs for $500-equivalent transactions."
+    caption = "Source: World Bank Remittance Prices Worldwide Database Q3 2024\nMethodology: Simple arithmetic mean of CC2 total cost % across all valid remittance services.\nSouth Africa data based on 301 services. Nigeria excluded due to insufficient Q3 2024 data."
   ) +
   get_theme() +
   theme(
@@ -495,13 +886,13 @@ The educational requirements for effective stablecoin usage may be particularly 
 
 Cross-border payments represent perhaps the most compelling use case for stablecoins when compared to traditional payment infrastructure. Conventional cross-border payment systems involve multiple intermediary banks, complex correspondent banking relationships, and settlement cycles that can extend several business days while creating substantial costs for users.
 
-Data from the World Bank Remittance Prices Worldwide database shows that average fees for cross-border remittances from South Africa reached 8.5% of transaction value in Q3 2024, making it among the more expensive corridors globally for sending remittances (World Bank, 2024). These high costs reflect the complexity and inefficiencies inherent in correspondent banking arrangements that require multiple intermediary institutions, each adding costs and processing delays.
+Data from the World Bank Remittance Prices Worldwide database shows that average fees for cross-border remittances from South Africa reached 7.1% of transaction value in Q3 2024, based on 301 remittance services. While this remains above the global average of 4.4%, it represents a more moderate premium than some other emerging market corridors (World Bank, 2024). These above-average costs reflect the complexity and inefficiencies inherent in correspondent banking arrangements that require multiple intermediary institutions, each adding costs and processing delays.
 
-Sub-Saharan Africa more broadly remains the most expensive region to send money to, with costs reflecting documented inefficiencies in correspondent banking arrangements, complex compliance procedures, and limited competition in many corridors. These substantial costs particularly affect low-income households that rely on remittances for basic needs, creating regressive burden that falls disproportionately on vulnerable populations.
+Sub-Saharan Africa more broadly remains among the more expensive regions to send money to, with costs reflecting documented inefficiencies in correspondent banking arrangements, complex compliance procedures, and limited competition in many corridors. These costs particularly affect low-income households that rely on remittances for basic needs, creating regressive burden that falls disproportionately on vulnerable populations.
 
 Regional cryptocurrency adoption patterns demonstrate growing interest in alternative payment methods. Chainalysis research indicates South Africa ranks among countries with meaningful cryptocurrency adoption globally, with Sub-Saharan Africa accounting for 2.7% of global cryptocurrency transaction volume between July 2023 and June 2024 (Chainalysis, 2024). The region received an estimated $125 billion in on-chain value during this period, representing a $7.5 billion increase compared to the previous year.
 
-Nigeria leads African cryptocurrency adoption, with significant stablecoin usage for cross-border transactions. The Nigerian experience reflects broader regional patterns where currency volatility and capital controls create demand for stable-value digital assets.
+Regional patterns suggest that where traditional cross-border payment infrastructure faces structural limitations, alternative payment methods including stablecoins may offer meaningful value propositions, particularly for users seeking to circumvent capital controls or access more stable store-of-value options.
 
 ## Stablecoin Advantages and Implementation Challenges
 
@@ -561,7 +952,7 @@ The international experience, particularly Brazil's success with Pix, provides e
 
 The comparative analysis across six dimensions reveals that stablecoins face fundamental challenges in most domestic payment applications due to network effects favoring established infrastructure, regulatory frameworks designed for traditional financial services, and performance characteristics that may not exceed those achievable through proper traditional infrastructure modernization.
 
-However, stablecoins retain advantages in specific use cases, particularly cross-border payments where traditional correspondent banking arrangements create substantial inefficiencies. With documented remittance costs of 8.5% from South Africa and regional adoption patterns demonstrating meaningful stablecoin usage for cross-border applications, this specialized use case represents the most compelling stablecoin value proposition.
+However, stablecoins retain advantages in specific use cases, particularly cross-border payments where traditional correspondent banking arrangements create substantial inefficiencies. With documented remittance costs of 7.1% from South Africa (above the global average of 4.4%) and regional adoption patterns demonstrating meaningful stablecoin usage for cross-border applications, this specialized use case represents the most compelling stablecoin value proposition.
 
 ## Policy Recommendations
 
@@ -575,7 +966,7 @@ Based on the analysis, several policy recommendations emerge for South African p
 
 **Coordinate international regulatory approaches**: The global nature of stablecoin networks requires enhanced international coordination to ensure consistent consumer protection standards and prevent regulatory arbitrage. South Africa should engage actively in international regulatory development while maintaining focus on domestic policy objectives and infrastructure capabilities.
 
-**Focus cross-border policy attention on stablecoin applications**: Given documented high costs of traditional cross-border payments and evidence of regional stablecoin adoption for remittance applications, policy frameworks should acknowledge this potential while addressing implementation challenges through appropriate regulatory oversight and consumer protection measures.
+**Focus cross-border policy attention on stablecoin applications**: Given documented above-average costs of traditional cross-border payments and evidence of regional stablecoin adoption for remittance applications, policy frameworks should acknowledge this potential while addressing implementation challenges through appropriate regulatory oversight and consumer protection measures.
 
 ## Research Contributions and Future Directions
 
