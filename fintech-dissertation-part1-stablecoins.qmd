@@ -1,8 +1,8 @@
 ---
 title: "The Value Proposition of Stablecoins in South Africa's Evolving Digital Payment Landscape: A Comparative Analysis of Transaction Efficiency, Financial Inclusion, and Regulatory Frameworks"
-subtitle: "ECO5016W - Minor Dissertation in FinTech (Non-unitary option) - Topic 1"
+subtitle: "ECO5016W - Minor Dissertation in FinTech (Non-unitary option) - Topic 1 DRAFT"
 author: "Cesaire Tobias"
-date: "2025-09-01"
+date: "2025-08-01"
 format:
   pdf:
     date-format: "DD MMMM, YYYY"
@@ -684,7 +684,7 @@ ggplot(remittance_data, aes(x = reorder(Country, Q3_2024_Cost_Percent), y = Q3_2
     subtitle = "Average cost as percentage of transfer amount (Q3 2024, $500 equivalent)",
     x = "Country",
     y = "Average Cost (%)",
-    caption = "Source: World Bank Remittance Prices Worldwide Database Q3 2024\nMethodology: Simple arithmetic mean of CC2 total cost % across all valid remittance services.\nSouth Africa data based on 301 services. Nigeria excluded due to insufficient Q3 2024 data."
+    caption = "Source: World Bank Remittance Prices Worldwide Database Q3 2024\nMethodology: Simple arithmetic mean of CC2 total cost % across all valid remittance services."
   ) +
   get_theme() +
   theme(
@@ -737,7 +737,7 @@ The cost comparison becomes complex when considering the complete transaction ch
 
 Frost et al. (2024) identify that successful fast payment systems typically implement flat-fee or zero-fee structures to promote financial inclusion, contrasting with percentage-based fees common in traditional payment systems. This design principle reflects policy objectives to reduce barriers to small-value transactions that comprise the majority of retail payments.
 
-The SARB's Vision 2025 framework, established in 2018, mandates that instant payment systems like PayShap are structured to minimize transaction costs, particularly for small-value payments. This approach aligns with international best practices observed in Brazil's Pix system, where low transaction costs have been instrumental in achieving widespread adoption (Duarte et al., 2022).
+The SARB's Vision 2025 framework mandates that instant payment systems like PayShap are structured to minimize transaction costs, particularly for small-value payments. This approach aligns with international best practices observed in Brazil's Pix system, where low transaction costs have been instrumental in achieving widespread adoption (Duarte et al., 2022).
 
 ## Settlement Finality Mechanisms
 
