@@ -1,7 +1,28 @@
-.Rproj.user
+# Quarto build and cache files
+*.html
+*.pdf
+.cache/
+_quarto/
+
+# R and RStudio
+.Rproj.user/
 .Rhistory
 .RData
 .Ruserdata
-.Rproj
-/.quarto/
-~$*.xlsx
+*.Rproj
+
+# VSCode
+.vscode/
+
+# Excel lock files
+~$*
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Quarto publish metadata
+.quarto/
+
+# GitHub Pages output (if using _site/)
+_site/
