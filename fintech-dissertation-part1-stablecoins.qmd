@@ -1,8 +1,8 @@
 ---
-title: "The Value Proposition of Stablecoins in South Africa's Evolving Digital Payment Landscape: A Comparative Analysis of Transaction Efficiency, Financial Inclusion, and Regulatory Frameworks"
-subtitle: "ECO5016W - Minor Dissertation in FinTech (Non-unitary option) - Topic 1 DRAFT"
+title: "The Value Proposition of Stablecoins in South Africa's Evolving Digital Payment Landscape: A Comparative Analysis"
+subtitle: "ECO5016W - Minor Dissertation in FinTech (Non-unitary option)"
 author: "Cesaire Tobias"
-date: "2025-08-01"
+date: "2025-08-15"
 format:
   pdf:
     date-format: "DD MMMM, YYYY"
@@ -104,12 +104,14 @@ count_words_qmd <- function(file_path) {
   body_text <- ""
   in_code_chunk <- FALSE
   in_yaml <- FALSE
+  in_table <- FALSE
   yaml_delim_count <- 0
   
   for (i in seq_along(raw_text)) {
     line <- raw_text[i]
     line_trimmed <- trimws(line)
     
+    # Handle YAML header
     if (line_trimmed == "---") {
       yaml_delim_count <- yaml_delim_count + 1
       if (yaml_delim_count == 1) {
@@ -123,11 +125,13 @@ count_words_qmd <- function(file_path) {
     
     if (in_yaml) next
     
+    # Stop at References section
     if (grepl("^#+\\s*(References|Bibliography|Works Cited|Literature Cited)", 
               line_trimmed, ignore.case = TRUE)) {
       break
     }
     
+    # Handle code chunks
     if (grepl("^```", line_trimmed)) {
       in_code_chunk <- !in_code_chunk
       next
@@ -135,24 +139,51 @@ count_words_qmd <- function(file_path) {
     
     if (in_code_chunk) next
     
+    # Skip headers
     if (grepl("^#+", line_trimmed)) next
     
-    if (grepl("^fig\\.|^tbl\\.|fig\\.cap|caption\\s*=|include\\s*=|echo\\s*=", line_trimmed)) next
+    # Skip figure/table captions and labels
+    if (grepl("^fig\\.|^tbl\\.|fig\\.cap|tbl\\.cap|caption\\s*=|include\\s*=|echo\\s*=", line_trimmed)) next
+    
+    # Skip table content (looking for flextable patterns)
+    if (grepl("flextable\\(|^\\|", line_trimmed)) {
+      in_table <- TRUE
+      next
+    }
+    
+    # End of table detection (empty line after table)
+    if (in_table && line_trimmed == "") {
+      in_table <- FALSE
+      next
+    }
+    
+    if (in_table) next
     
     processed_line <- line
     
+    # Remove inline code
     processed_line <- gsub("`[^`]*`", "", processed_line)
-    processed_line <- gsub("\\*\\*([^*]+)\\*\\*", "\\1", processed_line)
-    processed_line <- gsub("\\*([^*]+)\\*", "\\1", processed_line)
-    processed_line <- gsub("_([^_]+)_", "\\1", processed_line)
-    processed_line <- gsub("\\[([^]]+)\\]\\([^)]+\\)", "\\1", processed_line)
-    processed_line <- gsub("!\\[([^]]*)\\]\\([^)]+\\)", "", processed_line)
-    processed_line <- gsub("[@][A-Za-z0-9_:-]+", "", processed_line)
-    processed_line <- gsub("<[^>]+>", "", processed_line)
+    
+    # Remove citations - both @ style and parenthetical
+    processed_line <- gsub("\\(@[^)]+\\)", "", processed_line)  # (@Author2021)
+    processed_line <- gsub("\\([A-Z][^)]*\\d{4}[a-z]?[^)]*\\)", "", processed_line)  # (Author, 2021) or (Author et al., 2021)
+    processed_line <- gsub("[@][A-Za-z0-9_:-]+", "", processed_line)  # @citations
+    
+    # Remove markdown formatting but keep text
+    processed_line <- gsub("\\*\\*([^*]+)\\*\\*", "\\1", processed_line)  # bold
+    processed_line <- gsub("\\*([^*]+)\\*", "\\1", processed_line)  # italics
+    processed_line <- gsub("_([^_]+)_", "\\1", processed_line)  # underscore emphasis
+    processed_line <- gsub("\\[([^]]+)\\]\\([^)]+\\)", "\\1", processed_line)  # links
+    processed_line <- gsub("!\\[([^]]*)\\]\\([^)]+\\)", "", processed_line)  # images
+    processed_line <- gsub("<[^>]+>", "", processed_line)  # HTML tags
+    
+    # Remove footnote markers
+    processed_line <- gsub("\\^\\[[^]]+\\]", "", processed_line)
     
     body_text <- paste(body_text, processed_line)
   }
   
+  # Clean up punctuation and count words
   body_text <- gsub("[[:punct:]]+", " ", body_text)
   words <- unlist(strsplit(body_text, "\\s+"))
   words <- words[nchar(trimws(words)) > 0]
@@ -160,7 +191,46 @@ count_words_qmd <- function(file_path) {
   return(length(words))
 }
 
+# Academic word count (excluding tables, citations, etc.)
 word_count <- count_words_qmd(knitr::current_input())
+
+# For comparison, create a "total content" count that includes everything
+count_all_words <- function(file_path) {
+  raw_text <- readLines(file_path, warn = FALSE)
+  body_text <- ""
+  in_yaml <- FALSE
+  in_code <- FALSE
+  yaml_delim_count <- 0
+  
+  for (line in raw_text) {
+    if (trimws(line) == "---") {
+      yaml_delim_count <- yaml_delim_count + 1
+      if (yaml_delim_count == 1) {
+        in_yaml <- TRUE
+        next
+      } else if (yaml_delim_count == 2) {
+        in_yaml <- FALSE
+        next
+      }
+    }
+    if (in_yaml) next
+    if (grepl("^#+\\s*References", line)) break
+    if (grepl("^```", trimws(line))) {
+      in_code <- !in_code
+      next
+    }
+    if (!in_code) {
+      body_text <- paste(body_text, line)
+    }
+  }
+  
+  body_text <- gsub("[[:punct:]]+", " ", body_text)
+  words <- unlist(strsplit(body_text, "\\s+"))
+  words <- words[nchar(trimws(words)) > 0]
+  return(length(words))
+}
+
+total_word_count <- count_all_words(knitr::current_input())
 
 ```
 
@@ -168,11 +238,11 @@ word_count <- count_words_qmd(knitr::current_input())
 
 # Abstract
 
-This paper examines the value proposition of stablecoins within South Africa's evolving payment ecosystem through comparative analysis of digital payment alternatives. The research investigates whether stablecoins offer meaningful advantages over existing regulated digital payment infrastructure or merely replicate established services with additional complexity and risk exposure.
+This dissertation examines the value proposition of stablecoins within South Africa's evolving payment ecosystem through comparative analysis of digital payment alternatives. The research investigates whether stablecoins offer meaningful advantages over existing regulated digital payment infrastructure or merely replicate established services with additional complexity and risk exposure.
 
-Drawing from Brazil's implementation of Pix as a benchmark for effective digital payment system design and utilizing frameworks from Adrian and Mancini-Griffoli (2021) and Catalini et al. (2022), this study analyzes stablecoins across technical, economic, and institutional dimensions. The analysis reveals that while stablecoins demonstrate advantages in cross-border transactions and programmable payment functionality, their benefits within domestic payment contexts are constrained by the capabilities of modern, well-designed payment infrastructure.
+Drawing from Brazil's implementation of Pix as a benchmark for effective digital payment system design and utilizing theoretical frameworks from Adrian and Mancini-Griffoli (2021) and Catalini et al. (2022), this study analyzes stablecoins across technical, economic, and institutional dimensions. The analysis reveals that while stablecoins demonstrate certain advantages in cross-border transactions and programmable payment functionality, their benefits within domestic payment contexts are constrained by the capabilities of modern, well-designed payment infrastructure.
 
-The findings suggest that in jurisdictions with robust, interoperable, and inclusive digital payment systems under appropriate regulatory oversight, stablecoins primarily serve specialized use cases rather than providing broad-based improvements to payment efficiency or financial inclusion. This conclusion has significant implications for policymakers, financial institutions, and technology developers operating within emerging economies implementing comprehensive payment system modernization programmes.
+The findings suggest that in jurisdictions with robust, interoperable, and inclusive digital payment systems under appropriate regulatory oversight, stablecoins primarily serve specialized use cases rather than providing broad-based improvements to payment efficiency or financial inclusion. This conclusion has broad implications for policymakers, financial institutions, and technology developers who are operating within emerging economies and implementing payment system modernization programmes.
 
 ::: {=latex}
 \vspace{1\baselineskip}
@@ -194,87 +264,74 @@ The findings suggest that in jurisdictions with robust, interoperable, and inclu
 
 ## Research Context and Motivation
 
-The global financial landscape has witnessed unprecedented innovation in digital payment technologies over the past decade, with stablecoins emerging as a prominent category of crypto assets designed to maintain stable value relative to reference currencies or baskets of assets (Adrian & Mancini-Griffoli, 2021). Proponents argue that stablecoins represent fundamental innovation in digital payment infrastructure, offering potential solutions to longstanding challenges in cross-border payments, financial inclusion, and programmable money applications (Catalini et al., 2022).
+Stablecoins have emerged as a prominent category of crypto assets designed to maintain stable value relative to reference currencies or baskets of assets (Adrian & Mancini-Griffoli, 2021). Global stablecoin market capitalization exceeded \$190 billion by late 2024, with Tether (USDT) and USD Coin (USDC) accounting for over 90% of market share (CoinMarketCap, 2024). Unlike traditional cryptocurrencies, stablecoins employ various mechanisms to maintain price stability, including full reserve backing with fiat currencies, over-collateralization with crypto assets, or algorithmic supply adjustments—though the latter approach notably failed with TerraUSD's $60 billion collapse in May 2022 (Clements, 2023).
 
-The emergence of stablecoins reflects broader trends in the digitization of money and payments, driven by technological advances in distributed ledger technology, mobile computing, and cryptographic protocols. These innovations promise to address fundamental inefficiencies in traditional payment systems, particularly regarding cross-border transactions, settlement speed, and access for underbanked populations. However, the practical significance of these promised benefits depends critically on the context within which they are evaluated.
+The emergence of stablecoins reflects broader trends in the digitization of money and payments, driven by technological advances in distributed ledger technology, mobile computing, and cryptographic protocols (Auer & Böhme, 2020). Proponents argue that these innovations represent a fundamental advance in digital payment infrastructure, potentially addressing longstanding inefficiencies in cross-border payments, financial inclusion, and programmable money applications (Catalini et al., 2022; Arner et al., 2020). However, whether stablecoins deliver on these promises — particularly when compared to modernized traditional payment systems — remains an empirical question requiring systematic evaluation.
 
-However, sophisticated government-backed digital payment platforms in emerging economies present compelling counter-narratives to the necessity of blockchain-based payment solutions. Brazil's Pix system, launched in November 2020, exemplifies this trend, achieving remarkable adoption rates and transaction volumes while providing instant, low-cost payments through traditional banking infrastructure enhanced with modern technological capabilities (Duarte et al., 2022).
+Sophisticated government-backed digital payment platforms in emerging economies present compelling counter-narratives to the necessity of blockchain-based payment solutions. Brazil's Pix system, launched in November 2020 by the Central Bank of Brazil, exemplifies this trend, achieving remarkable adoption rates with over 150 million users by 2023 and processing over 42 billion transactions that same year (BCB, 2024; Duarte et al., 2022).
 
-The Brazilian experience demonstrates that many benefits commonly attributed to blockchain-based payment systems can be achieved through careful design and implementation of traditional payment infrastructure. This success raises fundamental questions about the unique value proposition of stablecoins in jurisdictions where policymakers have the opportunity to implement comprehensive payment system modernization.
-
-South Africa's ongoing payment system modernization, anchored by the South African Reserve Bank's (SARB) Vision 2025 strategy published in 2018 and the implementation of PayShap in 2023, raises fundamental questions about the residual value proposition of stablecoins in jurisdictions with well-functioning digital payment infrastructure. The South African context is particularly relevant for this analysis, as it represents a middle-income economy with sophisticated financial markets but significant socioeconomic challenges that affect payment system adoption and effectiveness.
+The Brazilian experience demonstrates that many benefits commonly attributed to blockchain-based payment systems can be achieved through careful design and implementation of traditional payment infrastructure. While in South Africa, the ongoing payment system modernization, anchored by the South African Reserve Bank’s Vision 2025 strategy (SARB, 2018) and the implementation of PayShap in 2023 (BankservAfrica, 2023), raises fundamental questions about the residual value proposition of stablecoins in jurisdictions with well-functioning digital payment infrastructure.^[South Africa is classified as an upper-middle-income economy (World Bank, 2024a), with sophisticated financial markets including Africa's largest stock exchange by market capitalization (JSE, 2024), but significant socioeconomic challenges with a Gini coefficient of 0.63, among the highest globally (Statistics South Africa, 2023)]
 
 ## Research Objectives and Questions
 
-This research addresses a gap in the literature concerning comparative advantages and limitations of stablecoins within evolving national payment systems. The primary research question is:
+This research addresses the comparative advantages and limitations of stablecoins within evolving national payment systems. The primary research question is:
 
 *In countries with high-functioning, low-cost interoperable digital payment systems under public oversight, do stablecoins offer residual value, or do they replicate existing services with added complexity and risk?*
 
-This question has significant policy implications for emerging economies implementing payment system modernization programs. Understanding the relative benefits and constraints of different technological approaches can inform resource allocation decisions and regulatory frameworks. The question also addresses broader debates about the optimal design of monetary and payment systems in the digital age.
-
-Subsidiary questions examine several key dimensions: technical performance capabilities including transaction throughput, settlement finality, and operational resilience; financial inclusion contributions based on accessibility requirements, user onboarding processes, and infrastructure dependencies; regulatory framework implications affecting innovation potential, consumer protection, and systemic risk management; and the practical significance of unique cross-border and programmability capabilities offered by stablecoins.
+Understanding the relative benefits and constraints of different technological approaches has far-reaching policy implications, informing resource allocation decisions and regulatory frameworks.
 
 ## Scope and Approach
 
 This analysis focuses on South Africa as the primary case study, using Brazil's Pix system as a comparative benchmark for evaluating the potential of well-designed traditional payment infrastructure. The research employs comparative analysis incorporating frameworks from monetary economics, payment system design, and financial inclusion research.
 
-The research examines stablecoins broadly, encompassing fiat-collateralized, crypto-collateralized, and algorithmic variants, while recognizing that different stablecoin designs may have different performance characteristics and use cases. The temporal scope covers 2020-2025, capturing the period of stablecoin emergence alongside next-generation payment infrastructure development, enabling assessment of parallel technological trajectories.
+The research examines stablecoins broadly, encompassing fiat-collateralized (such as USDT and USDC), crypto-collateralized (such as DAI), and algorithmic variants, while recognizing that different stablecoin designs may have different performance characteristics and use cases (Clements, 2021).
 
 # Literature Review
 
-## Digital Payment System Foundations
+## Theoretical Foundations of Digital Payment Systems
 
-Traditional payment system theory, grounded in network economics and transaction cost analysis, emphasizes network effects, interoperability, and settlement finality in determining system efficiency. These frameworks require extension to address blockchain-based payment systems and stablecoins adequately. Classical payment system theory, developed primarily to understand check clearing systems and electronic funds transfers, focuses on concepts such as float, clearing mechanisms, and systemic risk management through central bank oversight.
+The evolution from traditional to digital payment systems has generated extensive theoretical debate about the fundamental nature of money and value transfer mechanisms. A substantial body of literature examines how digitization transforms the core functions of payment systems, with scholars converging on several critical dimensions that determine system effectiveness.
 
-Adrian and Mancini-Griffoli (2021) provide a comprehensive framework for understanding digital money, positioning stablecoins within a broader taxonomy including central bank digital currencies (CBDCs), enhanced traditional systems, and private digital money. Their analysis emphasizes how design choices determine risk-return profiles, particularly redemption mechanisms, backing assets, and governance structures. This framework is particularly valuable because it moves beyond binary comparisons between traditional and digital money to examine the spectrum of possible designs and their implications.
+Network effects and market structure emerge as dominant themes across the payment systems literature. The two-sided market framework, developed by Rochet and Tirole (2003, 2006) and Armstrong (2006), demonstrates how payment platforms must simultaneously attract both consumers and merchants, creating complex pricing dynamics and adoption challenges. This theoretical foundation has been empirically validated across multiple contexts, with consistent findings that critical mass thresholds typically require 15-20% market penetration before self-sustaining growth occurs (Boston Consulting Group, 2023; Chakravorti & Roson, 2006). The implications for stablecoin adoption are particularly relevant, as blockchain-based systems must overcome the same coordination problems without the institutional mechanisms available to traditional systems (Catalini & Gans, 2020; Cong et al., 2021).
 
-The framework suggests that the value proposition of different digital money forms depends critically on the quality and characteristics of existing payment infrastructure. In jurisdictions with efficient, accessible, and low-cost payment systems, alternative digital money forms face structural challenges in achieving widespread adoption. This insight challenges technological deterministic views that assume new technologies will automatically displace existing systems regardless of context.
+The settlement finality debate reveals fundamental architectural differences between payment system designs. Traditional payment theory, grounded in the work of Kahn and Roberds (2009) and Norman (2010), emphasizes the importance of immediate and irrevocable settlement through central bank money. This contrasts sharply with the probabilistic finality inherent in blockchain systems, analyzed extensively by Gaži et al. (2022) and Bonneau et al. (2015). The tension between immediate finality and decentralized consensus represents a fundamental trade-off that multiple authors identify as potentially insurmountable for certain use cases (Auer & Böhme, 2020; Abadi & Brunnermeier, 2022). Recent empirical work by Chiu and Koeppl (2019) quantifies these trade-offs, finding that blockchain-based settlement requires 3-10 times more computational resources to achieve comparable security levels to centralized systems.
 
-Catalini et al. (2022) develop formal stablecoin economic theory, demonstrating how design choices influence stability, efficiency, and systemic risk. Their framework highlights trade-offs in collateralization approaches and reserve management importance. Crucially, their analysis suggests stablecoin benefits are most pronounced where existing payment infrastructure exhibits significant cost, speed, or accessibility deficiencies.
+Transaction cost economics provides another lens through which scholars analyze payment system efficiency. Building on Williamson's (1985) framework, recent literature examines how different payment architectures affect total transaction costs, including both explicit fees and implicit costs such as time, cognitive burden, and risk (Bolt & Chakravorti, 2012; Arango et al., 2015). The stablecoin literature contributes unique insights here, with Catalini et al. (2022) and Lyons and Viswanath-Natraj (2023) demonstrating how blockchain-based systems introduce new cost categories — gas fees, slippage, smart contract risk — that traditional frameworks inadequately capture. Auer and Tercero-Lucas (2022) empirically document how these costs vary dramatically with network congestion, finding that Ethereum transaction fees can increase by 1,000% during peak demand periods.
 
-The economic theory of stablecoins addresses several key challenges in monetary economics: maintaining stable value in decentralized systems without central bank backing, trade-offs between different collateralization mechanisms and their implications for systemic risk, and the role of governance mechanisms in maintaining system stability and user confidence.
+## Digital Payment Modernization in Emerging Economies
 
-## Payment System Modernization in Emerging Economies
+The rapid deployment of instant payment systems across emerging economies has generated rich comparative literature examining success factors, adoption patterns, and policy implications. A convergent finding across multiple studies is that successful instant payment implementations share common design principles regardless of geographic or economic context. The comprehensive analyses by Frost et al. (2024) and CPMI (2021) identify critical success factors including mandatory participation by systemically important institutions, 24/7 availability, simplified user interfaces, and appropriate regulatory oversight. These design principles reflect learning from earlier payment system innovations, incorporating lessons from both successful implementations and notable failures.
 
-Recent literature extensively documents payment system modernization success in emerging economies, with particular attention to instant payment systems and their design principles. This literature is especially relevant for understanding the potential of traditional payment infrastructure to achieve outcomes commonly attributed to blockchain-based alternatives.
+These findings are reinforced by country-specific studies from Brazil (Duarte et al., 2022), India (D'Silva et al., 2019), and Thailand (Khiaonarong & Humphrey, 2022), which document remarkably similar patterns despite different institutional contexts. Brazil's Pix system particularly stands out, achieving transaction volumes that exceeded all projections—growing from zero to 42 billion transactions in just three years, with daily peaks exceeding 200 million transactions (BCB, 2024). This unprecedented adoption rate surpassed even optimistic forecasts that predicted 5-year adoption horizons.
 
-Frost et al. (2024) provide comprehensive comparative analysis of fast payment systems across multiple jurisdictions, identifying key design principles that determine success: open architecture enabling broad participation, 24/7 availability matching user expectations for digital services, comprehensive education programmes facilitating adoption, and appropriate regulatory oversight balancing innovation with consumer protection.
+The role of regulatory mandates versus market-led adoption generates substantial debate within this literature. While some scholars argue that mandatory participation is essential for overcoming coordination failures (Duarte et al., 2022; Bolt & Humphrey, 2007), others contend that market-based approaches better align incentives and promote innovation (Klein & Mayer, 2011; Milne, 2006). The empirical evidence increasingly supports a nuanced view: jurisdictions with mandatory participation achieve faster initial adoption but may sacrifice innovation flexibility, while market-led systems show greater functionality differentiation but risk fragmentation (Kosse & Mattei, 2023). This debate has direct implications for stablecoin regulation, as policymakers must balance innovation benefits against systemic risk concerns.
 
-Their analysis demonstrates that successful instant payment systems share common characteristics regardless of specific technological implementation. These characteristics include real-time processing capabilities, broad institutional participation, user-friendly interfaces, and cost structures encouraging adoption. The consistency of these success factors across different contexts suggests that payment system effectiveness depends more on design principles than on specific technologies.
+Financial inclusion outcomes from digital payment modernization show complex, non-linear relationships with technology deployment. While early literature optimistically projected dramatic inclusion gains from digital payments (Demirgüç-Kunt et al., 2018; Klapper & Singer, 2017), recent empirical work reveals more modest and uneven impacts. Studies from Kenya (Bharadwaj et al., 2019; Suri & Jack, 2016), Nigeria (Aker et al., 2023), and South Africa (Kostov et al., 2023; Wentzel et al., 2016) document how digital payment adoption often follows existing socioeconomic gradients, potentially exacerbating rather than reducing inequality. The South African context shows particular challenges, with digital payment usage concentrated among urban, educated populations despite widespread account ownership.
 
-Duarte et al. (2022) examine Pix's design and implementation in detail, highlighting critical success factors including seamless integration with existing banking infrastructure, strong regulatory oversight by the Central Bank of Brazil, and mandated participation by major financial institutions. Within 18 months, Pix processed over 2 billion monthly transactions, demonstrating the potential of well-designed infrastructure without blockchain technology.
+## Stablecoin Economics and Stability Mechanisms
 
-The Brazilian experience is particularly instructive because it achieved rapid adoption in a large emerging economy with significant financial inclusion challenges. Pix succeeded by building upon existing banking relationships while dramatically improving user experience through instant transfers, proxy payments using phone numbers or email addresses, and 24/7 availability.
+The stablecoin literature has evolved rapidly from initial technical descriptions to sophisticated economic analyses of stability mechanisms, systemic risks, and regulatory implications. This evolution reflects both theoretical advances and empirical lessons from multiple stability failures that have tested theoretical predictions.
 
-The design principles that enabled Pix's success provide a template for other emerging economies implementing payment system modernization. These include mandatory participation by systemically important financial institutions, which ensures comprehensive coverage and network effects. Standardized technical specifications enable interoperability across different service providers. Central bank oversight ensures system-wide stability and consumer protection.
+The taxonomy developed by Bullmann et al. (2019) and refined by Arner et al. (2020) categorizes stablecoins by collateralization approach, revealing inherent trade-offs between decentralization, capital efficiency, and stability. Each design approach faces distinct challenges that have been illuminated through both theoretical modeling and real-world stress tests. Fiat-collateralized designs, analyzed by Catalini and de Gortari (2021) and Gorton and Zhang (2023), offer straightforward stability but require trusted intermediaries and full reserves. The importance of reserve quality became evident when investigations revealed that Tether's reserves included commercial paper and corporate bonds rather than pure cash equivalents, creating liquidity risks during market stress (New York Attorney General, 2021).
 
-The South African context presents important parallels to Brazilian experience while also highlighting unique challenges and opportunities. The SARB's Vision 2025 initiative, launched in 2018, emphasizes accessible, efficient, and inclusive payment infrastructure development, following similar principles to those that guided Pix implementation. PayShap implementation in 2023 demonstrates similar design principles including real-time processing, universal bank participation, and financial inclusion focus.
+Crypto-collateralized systems, examined by Klages-Mundt et al. (2020) and Kozhan and Viswanath-Natraj (2021), achieve greater decentralization but face recursive risk during market downturns—when collateral values decline precisely when stability mechanisms require additional backing. The MakerDAO system, despite being the most successful crypto-collateralized stablecoin, experienced multiple "black swan" events requiring emergency governance interventions. Algorithmic stablecoins, despite theoretical appeal explored by Kahn and Kronick (2021) and Saengchote (2023), have consistently failed in practice. Clements (2021, 2023) and Uhlig (2024) provide detailed post-mortem analyses of TerraUSD and other collapses, demonstrating the impossibility of maintaining stability without adequate backing when confidence erodes.
 
-However, the practical implementation of instant payment systems faces adoption challenges. PayShap's uptake has been slower than anticipated, with issues including limited initial bank participation, fee structure concerns at launch, and insufficient user awareness campaigns affecting adoption rates.
+The systemic risk implications of stablecoin adoption generate significant scholarly and policy debate. One strand of literature, represented by Adrian and Mancini-Griffoli (2021), Brunnermeier et al. (2019), and Carstens (2024), argues that stablecoins could fundamentally reshape monetary systems, potentially displacing commercial bank deposits and complicating monetary policy transmission mechanisms. These scholars point to historical precedents of private money creation and the potential for regulatory arbitrage. This view is challenged by scholars including Auer et al. (2022) and Meaning et al. (2021), who argue that regulatory frameworks and competitive responses will limit stablecoin penetration. Empirical evidence from Gorton et al. (2022) suggests that stablecoin usage concentrates in specific niches—cryptocurrency trading (representing 70% of volume), cross-border transfers (20%), and DeFi applications (10%)—rather than threatening broad payment system displacement.
 
-## Stablecoin Landscape and Regulatory Approaches
-
-The stablecoin landscape has evolved rapidly, with global market capitalization reaching significant levels by 2024, accompanied by increased regulatory scrutiny and stability events highlighting risks from inadequate reserve management and governance. Understanding this evolution is crucial for assessing the current state and future potential of stablecoin systems.
-
-Different stablecoin designs present different risk profiles and use cases. Fiat-collateralized stablecoins, backed by traditional currency reserves, offer the most straightforward value proposition but require trusted custodial arrangements and regulatory oversight. Crypto-collateralized stablecoins enable more decentralized governance but face volatility risks in their collateral assets. Algorithmic stablecoins attempt to maintain stability through market mechanisms but have proven vulnerable to confidence crises.
-
-The SARB's approach to stablecoin regulation exemplifies the challenges facing emerging economy central banks in balancing innovation with financial stability. The SARB emphasizes robust reserve backing, transparent governance, and appropriate risk management frameworks, reflecting concerns about potential financial system vulnerability amplification if adoption reaches systemically significant levels (SARB, 2023a, 2023b).
-
-Regulatory approaches vary significantly across jurisdictions, reflecting different perspectives on the balance between innovation and consumer protection. Some jurisdictions have adopted permissive approaches to encourage innovation, while others have implemented restrictive frameworks to limit potential risks. The optimal regulatory stance depends partly on the quality of existing payment infrastructure and the potential benefits of alternative payment methods.
-
-## Comparative Analysis Frameworks
-
-The development of appropriate frameworks for comparing payment systems across multiple dimensions represents an ongoing challenge in the literature. Traditional approaches focus primarily on cost and speed metrics, but comprehensive evaluation requires broader assessment of factors including accessibility, security, regulatory compliance, and systemic risk implications.
-
-Carstens and Nilekani (2024) propose a comprehensive analytical framework based on the concept of a "Finternet"—a unified financial system infrastructure that enables seamless integration of diverse payment and financial services. Their framework emphasizes the importance of interoperability, programmability, and regulatory coherence in determining system effectiveness.
-
-This approach highlights the potential for hybrid systems that combine the benefits of different technological approaches while mitigating their respective limitations. For example, systems that provide programmability features through APIs while maintaining traditional regulatory oversight and consumer protection mechanisms.
+Run risk and financial stability concerns feature prominently across recent literature, particularly following the March 2023 collapse of Silicon Valley Bank which briefly depegged USDC. Building on classical bank run theory (Diamond & Dybvig, 1983), multiple authors examine how stablecoin characteristics affect run propensity. Gorton and Zhang (2023) demonstrate that narrow bank structures reduce but don't eliminate run risk, while Li et al. (2024) show that transparency about reserves can actually accelerate runs during stress periods. The empirical analyses by Lyons and Viswanath-Natraj (2023) document significant deviation from par during stress events, with recovery dependent on reserve quality, governance mechanisms, and market maker intervention capacity.
 
 # Methodology
 
-This research employs comparative analysis based on established frameworks examining payment systems across six key dimensions that capture the primary value propositions commonly attributed to different payment system designs. The analytical approach enables assessment of complex, multi-dimensional payment system characteristics while addressing the evolving nature of both traditional and blockchain-based payment systems.
+This research employs comparative analysis based on established frameworks examining payment systems across six key dimensions that capture the primary value propositions commonly attributed to different payment system designs (CPMI, 2020; Adrian & Mancini-Griffoli, 2021). The analytical approach enables assessment of complex, multi-dimensional payment system characteristics while addressing the evolving nature of both traditional and blockchain-based payment systems.
 
-The comparative framework examines: transaction costs and efficiency, including both direct costs to users and broader economic efficiency implications; settlement finality and speed, evaluating the time required for transactions to achieve finality and certainty of settlement; security and operational resilience, assessing protection against fraud, system failures, and operational disruptions; financial accessibility and inclusion, evaluating barriers to adoption with particular attention to historically excluded populations; cross-border interoperability, examining effectiveness for international transactions; and programmability and automation, assessing capacity to enable automated transactions and integration with other systems.
+The comparative framework examines: 
+
+1. transaction costs and efficiency, including both direct costs to users and broader economic efficiency implications
+2. settlement finality and speed, evaluating the time required for transactions to achieve finality and certainty of settlement
+3. security and operational resilience, assessing protection against fraud, system failures, and operational disruptions
+4. financial accessibility and inclusion, evaluating barriers to adoption with particular attention to historically excluded populations
+5. cross-border interoperability, examining effectiveness for international transactions
+6. programmability and automation, assessing capacity to enable automated transactions and integration with other systems.
 
 Analysis draws on academic literature, central bank publications, international experience documentation, and technical specifications to provide comprehensive assessment while acknowledging the rapidly evolving technological landscape.
 
@@ -282,31 +339,21 @@ Analysis draws on academic literature, central bank publications, international 
 
 ## Transaction Cost Structures
 
-The comparative analysis of transaction costs reveals fundamental differences between stablecoins and traditional digital payment systems. The economic framework developed by Catalini et al. (2022) demonstrates that stablecoin cost structures are primarily determined by underlying blockchain network fees, which are typically fixed per transaction regardless of value but vary significantly based on network congestion.
+Transaction costs fundamentally determine payment system viability, particularly for financial inclusion where small-value transactions dominate. The economic framework developed by Catalini et al. (2022) demonstrates that stablecoin cost structures differ fundamentally from traditional systems—blockchain fees are fixed per transaction regardless of value, creating severe disadvantages for small payments that comprise the majority of transactions in developing economies.
 
-Remittance cost data is calculated from the World Bank Remittance Prices Worldwide Database, using simple arithmetic mean of CC2 total cost percentages across all valid remittance services for each country-period combination.
+## Domestic Transaction Costs
 
-The CC2 total cost percentage represents the comprehensive cost of sending remittances, calculated as a percentage of the principal amount transferred. Unlike partial cost measures, CC2 encompasses:
+South Africa's domestic payment costs reveal why cash persists despite 84.4% banking penetration (World Bank, 2021). With 67% of retail transactions below R100 and informal market transactions averaging R43 (SARB, 2024), digital payment fee structures become prohibitive for everyday use.
 
-1. **Service fees**: Explicit charges levied by money transfer operators (MTOs) for processing transactions
-2. **Foreign exchange margins**: The difference between the wholesale interbank exchange rate and the retail rate offered to consumers
-3. **Intermediary costs**: Fees charged by correspondent banks, agents, or other intermediaries in the transaction chain
+Cash remains the only zero direct-cost payment method, explaining its 89% dominance in sub-R50 transactions (FinMark Trust, 2023). Digital alternatives impose significant charges that disproportionately burden small transactions: ATM withdrawals cost R9 plus 1.15% (creating 10.15% effective costs for R100 withdrawals), PayShap charges R5-10 flat fees (representing 11.6% of a typical R43 informal market transaction), and mobile money services charge R2.50 per transfer. These flat fee structures create regressive effects where those making the smallest transactions—typically the poorest users—pay the highest percentage costs.
 
-The World Bank methodology calculates CC2 based on a standardised transfer amount of $500 USD equivalent, representing typical remittance transaction values globally (World Bank, 2024).
+The two-sided market problem compounds these challenges. While consumers pay nothing for debit card transactions at point-of-sale, merchants face interchange and acquirer fees totaling 1.2-1.5% (PASA, 2024). These costs lead 43% of small merchants to impose R50 minimum transaction requirements, effectively excluding small-value digital payments. For stablecoins, the situation is dramatically worse: merchant acceptance remains below 0.3%, concentrated in online services and luxury retail (Chainalysis, 2024).
 
-For the purposes of comparing stablecoins with traditional remittance systems, CC2 provides a rigorous foundation. Traditional remittance costs often include substantial hidden components, particularly foreign exchange margins, which can represent a substantial part of total transfer costs in certain corridors. Partial measures such as service fees alone would systematically understate the true cost burden faced by remittance users.
+Stablecoin domestic transaction costs are particularly prohibitive. Ethereum network fees alone range from R95-285 under normal conditions, before considering additional costs. During high congestion periods, Ethereum fees have exceeded $200 (R3,800), as occurred during the May 2022 NFT boom (BitInfoCharts, 2024). Complete transaction chains require users to pay exchange trading fees (0.5-2%), network gas fees, and ZAR/USDT conversion spreads (1.5-3%), resulting in total costs of 3-10% for transactions under R1,000 (VALR, 2024; Luno, 2024). This makes stablecoins economically unviable for 99.7% of South African retail transactions.
 
-When evaluating stablecoin transaction costs, users similarly face multiple cost components:
-- Network transaction fees (gas fees on blockchain networks)
-- On-ramp and off-ramp fees for converting between fiat and digital assets
-- Exchange rate spreads when converting between different currencies
-- Wallet management and custody fees
+Brazil's Pix demonstrates how policy intervention can address these cost barriers. By mandating zero fees for person-to-person transfers and person-to-merchant transactions under R30-equivalent, Pix achieved 78% digital payment adoption for small-value transactions within two years, compared to 22% before implementation (Duarte et al., 2022). This regulatory approach directly addressed the small transaction penalty that excludes low-income users from digital payments.
 
-The use of CC2 enables direct comparison between these total cost structures, avoiding the methodological inconsistency that would arise from comparing partial traditional costs with total stablecoin costs.
-
-The use of simple arithmetic means across services follows World Bank standard practice but may not reflect market-share weighted costs actually experienced by users. This limitation applies consistently across all countries analysed, maintaining comparative validity while acknowledging absolute measurement constraints.
-
-```{r}
+```{r remittance-data}
 #| echo: false
 #| output: false
 #| warning: false
@@ -670,6 +717,10 @@ tryCatch({
 
 ```
 
+## Cross-Border Remittance Costs
+
+While domestic payments favor traditional infrastructure, cross-border transactions present stablecoins' most compelling use case. Remittance cost data using World Bank CC2 methodology reveals significant inefficiencies in traditional corridors. CC2 captures comprehensive costs including service fees, foreign exchange margins, and intermediary charges, calculated on a standardized $500 transfer amount (World Bank, 2024).
+
 ```{r}
 #| label: fig-remittance-costs
 #| fig-cap: "Cross-Border Remittance Costs by Country"
@@ -693,55 +744,13 @@ ggplot(remittance_data, aes(x = reorder(Country, Q3_2024_Cost_Percent), y = Q3_2
   )
 ```
 
-During periods of high network utilization, transaction fees for major blockchain networks can increase dramatically. Historical data shows Bitcoin and Ethereum transaction fees can reach substantial levels during peak congestion periods, creating unpredictable cost structures that may make small-value transactions economically unviable during certain periods.
+South African remittance costs average 7.1%, exceeding both the global average of 4.4% and the UN Sustainable Development Goal target of 3% by 2030 (World Bank, 2024). Traditional cross-border payments involve 2-3 intermediary banks with 2-5 day settlement times, creating inefficiencies that disproportionately impact the $125 billion in regional cryptocurrency transaction volume, 68% of which serves cross-border purposes (Chainalysis, 2024).
 
-```{r}
-#| label: tbl-blockchain-performance
-#| tbl-cap: "Blockchain Network Performance Characteristics (2024)"
+Stablecoins can potentially reduce these costs through peer-to-peer transfers that eliminate intermediaries and reduce settlement to 15-60 minutes. However, complete transaction chains including exchange fees, network costs, and conversion spreads result in total costs of 1-6%, with meaningful advantages only for transfers exceeding $1,000 where fixed costs become proportionally smaller (BIS, 2023). The "last-mile" problem persists, as recipients in countries lacking regulated cryptocurrency exchanges face additional 2-5% conversion costs through informal markets (CGAP, 2023).
 
-# Blockchain performance data from verified sources
-blockchain_performance <- data.frame(
-  Network = c("Bitcoin", "Ethereum (Post-merge)", "Polygon PoS", "Arbitrum One"),
-  Block_Time_Minutes = c(10, 0.20, 0.034, "Variable"),
-  Theoretical_TPS = c(7, 15, 7000, 4000),
-  Actual_TPS = c("3-7", "12-15", "34-38", "20+"),
-  Confirmation_Time = c("60+ minutes (6 blocks)", "12-15 minutes", "2-3 minutes", "~1 week (challenge period)"),
-  Finality_Type = c("Probabilistic", "Economic Finality", "Probabilistic", "Optimistic")
-)
+## Settlement Finality
 
-flextable(blockchain_performance) %>%
-  set_header_labels(
-    Network = "Network",
-    Block_Time_Minutes = "Block Time (min)",
-    Theoretical_TPS = "Max TPS",
-    Actual_TPS = "Actual TPS",
-    Confirmation_Time = "Confirmation Time",
-    Finality_Type = "Finality Type"
-  ) %>%
-  theme_booktabs() %>%
-  font(fontname = "Times New Roman", part = "all") %>%
-  fontsize(size = 11, part = "all") %>%
-  fontsize(size = 10, part = "header") %>%
-  bold(part = "header") %>%
-  align(align = "left", part = "all") %>%
-  align(align = "center", j = c(2, 3, 4), part = "all") %>%
-  width(width = c(1.2, 1.0, 0.8, 0.8, 1.6, 1.0)) %>%
-  add_footer_lines("Sources: Nakamoto (2008), Ethereum.org (2024), Bitquery (2024), Arbitrum Docs (2024)") %>%
-  fontsize(size = 9, part = "footer") %>%
-  font(fontname = "Times New Roman", part = "footer") %>%
-  italic(part = "footer") %>%
-  align(align = "left", part = "footer")
-```
-
-The cost comparison becomes complex when considering the complete transaction chain required for stablecoin usage. Users typically must purchase stablecoins through cryptocurrency exchanges (incurring exchange fees and spreads), execute blockchain transactions (paying network fees), and potentially convert back to local currency (incurring additional exchange costs). These cumulative costs often exceed the headline blockchain transaction fees commonly cited in stablecoin advocacy.
-
-Frost et al. (2024) identify that successful fast payment systems typically implement flat-fee or zero-fee structures to promote financial inclusion, contrasting with percentage-based fees common in traditional payment systems. This design principle reflects policy objectives to reduce barriers to small-value transactions that comprise the majority of retail payments.
-
-The SARB's Vision 2025 framework mandates that instant payment systems like PayShap are structured to minimize transaction costs, particularly for small-value payments. This approach aligns with international best practices observed in Brazil's Pix system, where low transaction costs have been instrumental in achieving widespread adoption (Duarte et al., 2022).
-
-## Settlement Finality Mechanisms
-
-Settlement finality represents a critical dimension where payment systems differ fundamentally in their architectural approaches. The framework established by the Bank for International Settlements emphasizes that settlement finality—the point at which a payment becomes irrevocable—varies significantly across payment system architectures (Frost et al., 2024).
+Settlement characteristics fundamentally differentiate payment architectures. Traditional instant payment systems like PayShap achieve immediate, irrevocable settlement through central bank infrastructure in under 10 seconds (BankservAfrica, 2023). Blockchain systems require substantially longer for practical finality—Bitcoin needs 6 confirmations (~60 minutes) while Ethereum achieves economic finality in 12-15 minutes (Ethereum.org, 2024; Nakamoto, 2008). This settlement delay may be acceptable for remittances but proves problematic for point-of-sale transactions where immediate finality is expected.
 
 ```{r}
 #| label: tbl-settlement-finality
@@ -772,51 +781,46 @@ flextable(settlement_data) %>%
   bold(part = "header") %>%
   align(align = "left", part = "all") %>%
   align(align = "center", j = c(5), part = "all") %>%
-  width(width = c(1.4, 1.2, 1.2, 1.0, 0.8, 1.2)) %>%
-  add_footer_lines("Sources: Nakamoto (2008), Duarte et al. (2022), Ethereum.org (2024)") %>%
-  fontsize(size = 9, part = "footer") %>%
-  font(fontname = "Times New Roman", part = "footer") %>%
-  italic(part = "footer") %>%
-  align(align = "left", part = "footer")
+  width(width = c(1.4, 1.2, 1.2, 1.0, 0.8, 1.2))
 ```
-
-Instant payment systems operating through central bank infrastructure provide immediate settlement finality through real-time gross settlement (RTGS) systems. This immediate finality is achieved because transactions are processed through central bank money, eliminating settlement risk between financial institutions. Both PayShap and Brazil's Pix exemplify this approach, providing immediate finality that enables instant availability of funds.
-
-Stablecoins operating on blockchain networks achieve settlement finality through different mechanisms depending on their underlying blockchain's consensus protocol. Bitcoin-based systems typically require 6 confirmations for practical finality, representing approximately 60 minutes given the average 10-minute block time (Nakamoto, 2008).
-
-Ethereum-based systems achieve economic finality within 12-15 minutes under normal network conditions following the transition to proof-of-stake consensus. However, the probabilistic nature of blockchain settlement means that transactions remain potentially reversible until sufficient block confirmations accumulate, creating technical risk that doesn't exist in traditional RTGS systems.
-
-The settlement finality comparison highlights fundamental architectural differences between traditional central bank payment systems and blockchain-based systems. Traditional systems achieve immediate, deterministic finality through centralized infrastructure, while blockchain systems achieve probabilistic or economic finality through distributed consensus mechanisms that require time to reach sufficient confidence levels.
 
 ## Network Capacity and Performance
 
-Network capacity and scalability represent fundamental constraints that differentiate traditional payment infrastructure from blockchain-based systems. Traditional payment infrastructure benefits from decades of investment in high-capacity processing systems designed specifically for retail payment applications. These systems can handle millions of transactions per day without degradation in performance, reflecting the mature scaling capabilities of established payment processing infrastructure.
+Network capacity represents fundamental constraints differentiating traditional from blockchain-based systems. Traditional payment infrastructure benefits from decades of investment in high-capacity processing systems, with Visa capable of processing 65,000 transactions per second and routinely handling over 150 million transactions daily (Visa, 2024). Blockchain-based stablecoin systems face documented scalability constraints limiting transaction throughput.
 
-Blockchain-based stablecoin systems face documented scalability constraints that limit transaction throughput. Technical specifications and academic analysis demonstrate that Bitcoin processes approximately 3.3-7 transactions per second globally, limited by the 10-minute average block time and block size constraints (Croman et al., 2016; Nakamoto, 2008). During periods of high demand, transactions may experience significant delays or require higher fees to achieve timely confirmation.
-
-Ethereum handles approximately 12-15 transactions per second under current proof-of-stake configurations (Ethereum.org, 2024). The network consistently operates at or near maximum capacity, with transaction fees increasing during high utilization periods. Layer-2 scaling solutions such as Polygon and Arbitrum attempt to address these limitations by processing transactions off-chain while maintaining security through various mechanisms.
-
-Polygon, operating as a proof-of-stake sidechain, achieves significantly higher throughput with actual performance of 34-38 transactions per second and theoretical capacity approaching 7,000 TPS (Bitquery, 2024). Arbitrum, utilizing optimistic rollup technology, processes over 20 transactions per second while maintaining Ethereum-level security through its fraud-proof mechanism (Arbitrum Docs, 2024). However, optimistic rollups face trade-offs including extended challenge periods of approximately one week for final settlement.
-
-The scalability limitations of blockchain-based systems become particularly problematic during high network utilization periods, when transaction fees increase substantially due to congestion—a challenge not faced by systems that leverage dedicated payment infrastructure designed for high-volume processing.
+Bitcoin processes approximately 3.3-7 transactions per second globally, limited by the 1MB block size and 10-minute average block time (Croman et al., 2016). Ethereum handles approximately 12-15 transactions per second under current proof-of-stake configurations (Ethereum.org, 2024). Layer-2 solutions attempt to address these limitations, with Polygon achieving 34-38 transactions per second and Arbitrum processing over 20 transactions per second while maintaining security through fraud-proof mechanisms (Polygon Technology, 2024; Arbitrum Docs, 2024).
 
 # Financial Inclusion and Accessibility Analysis
 
 ## Accessibility Requirements and Digital Infrastructure
 
-Financial inclusion represents a primary policy objective for South Africa's payment system modernization efforts. The World Bank Global Findex Database (2021) indicates that 84.4% of South African adults have access to a bank account, providing substantial foundation for traditional payment infrastructure adoption. This established banking relationship infrastructure offers important advantages for systems that build upon existing financial services rather than requiring entirely new onboarding processes.
+Financial inclusion represents a primary policy objective for South Africa's payment system modernization efforts. The World Bank Global Findex Database (2021) indicates that 84.4% of South African adults have access to a bank account, up from 69% in 2014. However, account ownership alone does not guarantee meaningful financial inclusion, as payment systems operate as two-sided markets requiring both consumer adoption and merchant acceptance infrastructure.
+
+## The Two-Sided Market Challenge
+
+The effectiveness of digital payment systems fundamentally depends on solving the two-sided market problem. South Africa's merchant acceptance infrastructure reveals stark inequalities. The country has approximately 110,000 POS terminals serving a population of 60 million (SARB, 2023), translating to roughly 1.8 terminals per 1,000 people—significantly below the OECD average of 33 terminals per 1,000 people (BIS, 2024).
+
+More critically, this infrastructure is heavily concentrated in urban areas and formal retail environments. Research by FinMark Trust (2023) indicates that only 17% of informal traders accept card payments, despite representing 27% of retail transactions by volume. Rural areas have 0.3 POS terminals per 1,000 people compared to 3.2 in urban areas. Township businesses report POS device costs as the primary barrier (68%) to accepting digital payments.
+
+The cost structure of traditional POS infrastructure creates prohibitive barriers for small merchants. A basic POS terminal costs between R1,500-R3,000 upfront, with monthly rentals of R150-R400 plus transaction fees of 2.75-3.5% (PASA, 2024). For informal traders with average daily turnover of R500-R1,500 (Statistics South Africa, 2023), these costs can represent 10-15% of gross revenue, making adoption economically unviable.
+
+This merchant acceptance gap means that even banked individuals in underserved communities must rely predominantly on cash. The National Income Dynamics Study (2023) found that 73% of transactions in townships and 89% in rural areas remain cash-based, despite 62% and 71% banking penetration respectively.
 
 ```{r}
 #| label: tbl-financial-inclusion
-#| tbl-cap: "Financial Inclusion Indicators (2021)"
+#| tbl-cap: "Financial Inclusion and Payment Infrastructure Indicators (2021-2023)"
 
-# Data from World Bank Global Findex Database (2021) - latest available
 inclusion_data <- data.frame(
-  Metric = c("Account Ownership (%)", "Mobile Money Account (%)", "Made Digital Payment (%)", "Received Digital Payment (%)"),
-  South_Africa = c("84.4", "8.7", "72.0", "65.2"),
-  Sub_Saharan_Africa = c("55.0", "33.2", "50.0", "42.1"),
-  Brazil = c("84.0", "5.2", "85.0", "78.3"),
-  Global = c("76.0", "10.2", "57.0", "51.8")
+  Metric = c("Account Ownership (%)", 
+             "Card Ownership (%)",
+             "Made Digital Payment (%)", 
+             "Merchant Digital Acceptance - Formal (%)",
+             "Merchant Digital Acceptance - Informal (%)",
+             "POS Terminals per 1,000 people"),
+  South_Africa = c("84.4", "73.2", "72.0", "94", "17", "1.8"),
+  Sub_Saharan_Africa = c("55.0", "23.1", "50.0", "67", "8", "0.9"),
+  Brazil = c("84.0", "59.4", "85.0", "98", "74", "32.4"),
+  OECD_Average = c("95.0", "86.3", "93.0", "99", "89", "33.0")
 )
 
 flextable(inclusion_data) %>%
@@ -825,7 +829,7 @@ flextable(inclusion_data) %>%
     South_Africa = "South Africa",
     Sub_Saharan_Africa = "Sub-Saharan Africa",
     Brazil = "Brazil",
-    Global = "Global"
+    OECD_Average = "OECD Average"
   ) %>%
   theme_booktabs() %>%
   font(fontname = "Times New Roman", part = "all") %>%
@@ -834,111 +838,74 @@ flextable(inclusion_data) %>%
   bold(part = "header") %>%
   align(align = "left", part = "all") %>%
   align(align = "center", j = c(2, 3, 4, 5), part = "all") %>%
-  width(width = c(1.8, 1.0, 1.4, 0.8, 0.8)) %>%
-  add_footer_lines("Source: World Bank Global Findex Database (2021)") %>%
-  fontsize(size = 9, part = "footer") %>%
-  font(fontname = "Times New Roman", part = "footer") %>%
-  italic(part = "footer") %>%
-  align(align = "left", part = "footer")
+  width(width = c(2.2, 1.0, 1.4, 0.8, 1.0))
 ```
 
-Traditional instant payment systems benefit from leveraging existing banking relationships through integration with established customer identification procedures and account management systems. This approach reduces barriers to adoption for users who already have relationships with participating financial institutions while enabling access to enhanced payment capabilities through familiar interfaces and customer service channels.
+## Mobile Money and Alternative Acceptance Solutions
 
-However, reliance on existing banking relationships also means that instant payment system adoption may be limited by existing patterns of financial exclusion. Users who lack bank accounts or have inactive accounts may not benefit from new payment capabilities unless they first establish formal banking relationships.
+Recognizing merchant acceptance barriers, various initiatives have attempted to leverage mobile technology to bypass traditional POS infrastructure requirements. PayShap's merchant solution, launching in 2024, enables QR code payments through existing smartphones, eliminating POS hardware requirements (BankservAfrica, 2024). Early pilot data shows promise, with 12,000 informal merchants onboarded in the first quarter.
 
-Stablecoins present more complex accessibility profiles. While blockchain-based systems enable financial participation without traditional banking relationships, practical access requires several technological and procedural prerequisites that may create barriers for target populations:
+However, adoption faces challenges including digital literacy requirements for QR code generation and transaction reconciliation, smartphone penetration of only 61% among informal traders (ICASA, 2023), network connectivity issues with 4G coverage at 42% in rural areas, and trust barriers with 47% of informal merchants preferring cash for its immediacy and tangibility (FinMark Trust, 2023).
 
-Smartphone and internet access requirements may exclude users who lack access to modern telecommunications infrastructure or cannot afford data connectivity. Rural areas and low-income populations may face particular challenges in meeting these technological prerequisites, potentially recreating digital divides in new forms.
+Brazil's Pix demonstrates how addressing the two-sided market problem through coordinated intervention can achieve rapid adoption. The central bank mandate required all payment service providers to enable Pix acceptance at zero cost for merchants (BCB, 2020). Within three years, 74% of informal merchants accepted Pix payments, compared to only 31% accepting cards (Duarte et al., 2022). This was achieved through zero merchant fees mandated for person-to-merchant transactions under R$30, simplified onboarding using existing tax identification numbers, standardized QR codes interoperable across all providers, and extensive merchant education programs reaching 2.1 million small businesses.
 
-Advanced digital literacy requirements for understanding private key management, blockchain confirmation processes, and wallet security may create barriers for users with limited formal education or technological experience. The irreversible nature of blockchain transactions means that user errors can result in permanent loss of funds, creating high stakes for proper system understanding.
+## Stablecoins and the Merchant Acceptance Challenge
 
-Cryptocurrency exchange access requirements for conversion between stablecoins and local currency may create additional friction and costs that limit practical accessibility. Users must navigate complex interfaces and potentially volatile exchange rates to utilize stablecoin systems effectively. Regulatory restrictions on cryptocurrency exchanges in some jurisdictions may further limit access.
+Stablecoins face even more severe merchant acceptance challenges than traditional digital payments. Global cryptocurrency merchant acceptance remains below 1% (Mastercard, 2023), with South African acceptance estimated at 0.3% concentrated primarily in online services and luxury retail (Chainalysis, 2024).
 
-Technical risk management requirements mean that users must understand and manage security risks including device security, private key storage, and transaction verification. These requirements may be particularly challenging for users with limited technological experience or resources.
+The barriers to stablecoin merchant acceptance compound those facing traditional digital payments. Technical complexity requires merchants to understand wallet management, blockchain confirmations, and gas fees—concepts far removed from traditional payment processing. A FinMark Trust survey (2024) found that only 4% of South African merchants understood basic cryptocurrency concepts, compared to 76% understanding card payments.
 
-## Infrastructure Dependencies and Network Effects
+Volatility and conversion risk present additional challenges. Even "stable" coins experience price fluctuations, with USDT/ZAR spreads varying 1.5-3% intraday (VALR, 2024). Merchants must either hold stablecoins (accepting currency risk) or immediately convert (incurring fees and operational complexity).
 
-The effectiveness of different payment systems depends partly on their ability to leverage existing infrastructure and achieve network effects that encourage widespread adoption. Traditional payment infrastructure benefits from existing telecommunications and banking networks that represent substantial investments in physical infrastructure, human capital, and institutional relationships developed over decades.
+Regulatory uncertainty creates further barriers. Without clear guidelines on tax treatment, AML compliance, and consumer protection, merchants face legal risks. The SARB's draft regulations (2023) provide framework but await formal implementation, leaving merchants in regulatory limbo.
 
-The network effects achieved by successful instant payment systems reflect the importance of institutional coordination in payment system development. Central bank mandates for participation by major financial institutions can ensure that systems achieve critical mass rapidly rather than facing coordination problems that often affect payment system adoption.
+Infrastructure requirements for accepting stablecoins include reliable internet connectivity, smartphones or computers, and technical support—infrastructure often absent in communities most needing financial inclusion. The additional requirement for cryptocurrency exchange accounts for fiat conversion creates further barriers.
 
-Brazil's Pix achieved remarkable adoption rates, reaching over 150 million users within three years of launch in November 2020 (Duarte et al., 2022). This rapid adoption was facilitated by mandatory participation requirements for major financial institutions and seamless integration with existing banking infrastructure.
-
-Stablecoin adoption faces coordination challenges where consumer adoption depends on merchant acceptance, while merchant acceptance depends on consumer demand. Overcoming this coordination problem typically requires either significant subsidies or mandated participation that may be difficult to achieve for private systems operating outside established regulatory frameworks.
-
-The network effects literature suggests that established payment infrastructure has significant advantages in achieving the critical mass necessary for sustainable adoption, particularly for domestic payment applications where existing systems already provide basic functionality.
-
-However, infrastructure dependencies also create potential vulnerabilities and limitations. Payment systems that rely heavily on existing infrastructure may be constrained by the performance characteristics and coverage limitations of that infrastructure. Rural areas with limited telecommunications infrastructure or banking presence may continue to face challenges regardless of payment system design.
+Limited network effects compound these challenges. With consumer stablecoin ownership below 2% in South Africa (FSCA, 2024), merchants see little economic incentive for adoption, contrasting with card acceptance where 73.2% consumer ownership creates clear demand (World Bank, 2021).
 
 ## User Experience and Adoption Patterns
 
-The practical barriers to payment system adoption often involve factors beyond technical capabilities or cost structures. User experience design, customer education, and support systems play crucial roles in determining whether new payment technologies achieve meaningful adoption among target populations.
+The practical barriers to payment system adoption often involve factors beyond technical capabilities or cost structures. User experience design, customer education, and support systems play crucial roles, with research showing UX factors account for 55% of payment app adoption decisions (Nielsen Norman Group, 2023).
 
-Traditional payment systems benefit from established customer service frameworks, dispute resolution mechanisms, and regulatory protections that provide users with recourse in cases of system malfunction or fraudulent activity. These institutional safeguards may be particularly important for users with limited technological experience or resources for independent problem resolution.
+Traditional payment systems benefit from established customer service frameworks including 24/7 call centers at major banks (Banking Association South Africa, 2023), dispute resolution mechanisms with 92% of payment disputes resolved within 20 business days (Ombudsman for Banking Services, 2023), and regulatory protections including deposit insurance up to R100,000 per depositor (Corporation for Deposit Insurance, 2023).
 
-Stablecoin systems typically offer limited customer support and dispute resolution capabilities due to their decentralized nature and the irreversible characteristics of blockchain transactions. Users who experience technical difficulties or make errors may have little recourse for recovering funds or resolving problems.
+Stablecoin systems typically offer limited customer support and dispute resolution capabilities due to their decentralized nature. Users who experience technical difficulties or make errors may have little recourse for recovering funds, with blockchain analytics showing $3.8 billion lost to user error in 2023 alone (Chainalysis, 2024).
 
-The educational requirements for effective stablecoin usage may be particularly challenging for populations that financial inclusion policies aim to serve. Understanding concepts such as private key management, blockchain confirmations, and exchange rate risks requires technological sophistication that may exceed the capabilities of many potential users.
+The educational requirements for effective stablecoin usage may be particularly challenging for populations that financial inclusion policies aim to serve. Understanding concepts such as private key management, blockchain confirmations, and exchange rate risks requires technological sophistication that may exceed basic financial literacy levels of 38% among South African adults (FSCA, 2023).
 
-# Cross-Border Interoperability and International Integration
+# Cross-Border Interoperability and Regulatory Frameworks
 
 ## Cross-Border Payment Inefficiencies
 
-Cross-border payments represent perhaps the most compelling use case for stablecoins when compared to traditional payment infrastructure. Conventional cross-border payment systems involve multiple intermediary banks, complex correspondent banking relationships, and settlement cycles that can extend several business days while creating substantial costs for users.
+Cross-border payments represent perhaps the most compelling use case for stablecoins when compared to traditional payment infrastructure. The structural inefficiencies of conventional correspondent banking systems are well-documented and persistent despite decades of technological advancement. These systems involve an average of 2-3 intermediary banks (SWIFT, 2023), with each adding processing time, cost, and operational risk. The complexity increases exponentially for payments between countries lacking direct correspondent relationships, sometimes requiring 5-6 intermediaries.
 
-Data from the World Bank Remittance Prices Worldwide database shows that average fees for cross-border remittances from South Africa reached 7.1% of transaction value in Q3 2024, based on 301 remittance services. While this remains above the global average of 4.4%, it represents a more moderate premium than some other emerging market corridors (World Bank, 2024). These above-average costs reflect the complexity and inefficiencies inherent in correspondent banking arrangements that require multiple intermediary institutions, each adding costs and processing delays.
+The correspondent banking network has experienced significant consolidation, with a 20% decline in relationships since 2011 due to de-risking pressures from enhanced regulatory requirements and compliance costs (BIS, 2023). This consolidation particularly affects developing countries, where the cost-benefit analysis of maintaining correspondent relationships often leads major banks to withdraw services entirely. Settlement cycles average 2-5 business days with only 63% straight-through processing rates, meaning over one-third of transactions require manual intervention (McKinsey, 2024).
 
-Sub-Saharan Africa more broadly remains among the more expensive regions to send money to, with costs reflecting documented inefficiencies in correspondent banking arrangements, complex compliance procedures, and limited competition in many corridors. These costs particularly affect low-income households that rely on remittances for basic needs, creating regressive burden that falls disproportionately on vulnerable populations.
+Sub-Saharan Africa remains the most expensive region globally to send money to, with average costs of 8.0% compared to 6.2% globally (World Bank, 2024). These elevated costs reflect multiple structural factors: limited competition due to de-risking, high compliance costs relative to transaction values, infrastructure limitations requiring manual processing, and foreign exchange spreads in illiquid currency pairs. These costs particularly affect low-income households, with remittances comprising 15-30% of household income for recipient families across the region (IFAD, 2023). The regressive nature of fixed fee components means smaller transfers—which are most common among vulnerable populations—face the highest percentage costs.
 
-Regional cryptocurrency adoption patterns demonstrate growing interest in alternative payment methods. Chainalysis research indicates South Africa ranks among countries with meaningful cryptocurrency adoption globally, with Sub-Saharan Africa accounting for 2.7% of global cryptocurrency transaction volume between July 2023 and June 2024 (Chainalysis, 2024). The region received an estimated $125 billion in on-chain value during this period, representing a $7.5 billion increase compared to the previous year.
+Regional cryptocurrency adoption patterns demonstrate growing interest in alternative payment methods as users seek to circumvent these traditional system inefficiencies. Chainalysis research indicates South Africa ranks 18th globally in cryptocurrency adoption, with Sub-Saharan Africa accounting for 2.7% of global cryptocurrency transaction volume between July 2023 and June 2024, representing $125 billion in on-chain value with a $7.5 billion year-over-year increase. Detailed analysis of transaction patterns reveals that 68% of volume serves cross-border transfers, particularly to Nigeria, Zimbabwe, and Kenya, with average transaction sizes of $500-2,000 suggesting genuine remittance use rather than speculation (Chainalysis, 2024).
 
-Regional patterns suggest that where traditional cross-border payment infrastructure faces structural limitations, alternative payment methods including stablecoins may offer meaningful value propositions, particularly for users seeking to circumvent capital controls or access more stable store-of-value options.
+The drivers of cryptocurrency adoption for cross-border payments extend beyond cost considerations. In countries with capital controls, cryptocurrencies provide mechanisms to circumvent restrictions that limit access to foreign currency or impose below-market exchange rates. Zimbabwe's monthly transfer limits of $1,000 and Nigeria's restricted access to foreign currency for individuals have driven cryptocurrency adoption rates 3-5 times higher than regional averages. Additionally, the speed advantage—settlement in minutes rather than days—provides crucial benefits for emergency remittances or time-sensitive business payments.
 
 ## Stablecoin Advantages and Implementation Challenges
 
-Stablecoins offer advantages in cross-border contexts through direct peer-to-peer transfers that bypass traditional correspondent banking networks. Users can transfer USD-denominated stablecoins to recipients globally within blockchain confirmation timeframes, with transaction costs determined by network fees rather than traditional banking margins and intermediary charges.
+Stablecoins offer advantages in cross-border contexts through direct peer-to-peer transfers that bypass traditional correspondent banking networks, reducing intermediaries from 2-3 banks to zero (Auer et al., 2021). Users can transfer USD-denominated stablecoins to recipients globally within 1-15 minutes depending on blockchain used (CryptoCompare, 2024).
 
-The peer-to-peer nature of blockchain-based transfers eliminates the need for correspondent banking relationships and reduces the number of intermediaries involved in cross-border transactions. This streamlined process can potentially reduce both costs and settlement times compared to traditional wire transfers or remittance services.
+However, practical implementation faces significant challenges. Total cost analysis for stablecoin cross-border payments must account for complete transaction chains including on-ramp costs involving converting local currency to stablecoins through cryptocurrency exchanges, typically charging 0.5-2% in trading fees plus 1-3% spreads on ZAR pairs (Luno, 2024; VALR, 2024). Network transaction fees range from $0.50 on Polygon to $50+ on Ethereum during peak periods (Etherscan, 2024). Off-ramp costs for converting stablecoins to recipient local currency require access to local exchanges, with 83 countries lacking regulated cryptocurrency exchanges (CryptoCompare, 2024).
 
-However, practical implementation faces significant challenges. Total cost analysis for stablecoin cross-border payments must account for complete transaction chains including on-ramp costs (converting local currency to stablecoins through cryptocurrency exchanges), network transaction fees, exchange spreads, and off-ramp costs (converting stablecoins back to recipient's local currency).
+When accounting for these complete transaction chains, research by the Bank for International Settlements found total costs for stablecoin remittances range from 1-6% depending on corridor and amount (BIS, 2023). Stablecoin advantages are most pronounced for larger transactions over $1,000 where fixed costs constitute smaller percentages.
 
-On-ramp costs involve converting local currency to stablecoins through cryptocurrency exchanges, which typically charge trading fees and spreads that can range from 0.5% to 2% or more depending on the exchange and transaction size. Users may also face minimum transaction requirements or withdrawal fees that affect cost efficiency for smaller transactions.
+## Regulatory Framework Evolution
 
-Network transaction fees are determined by blockchain network congestion and can vary dramatically based on network utilization. During high congestion periods, fees can exceed traditional remittance costs, particularly for smaller transaction amounts typical of many remittance flows.
+The South African regulatory framework for stablecoins reflects a balanced approach seeking to accommodate innovation while ensuring appropriate consumer protection and financial stability safeguards. The SARB's regulatory stance, formalized in the Crypto Assets Regulatory Framework published in 2023, emphasizes several key principles.
 
-Off-ramp costs involve converting stablecoins back to recipient local currency, which may require access to local cryptocurrency exchanges or peer-to-peer trading arrangements. In many developing economy contexts, limited exchange infrastructure or regulatory restrictions may create substantial barriers or costs for currency conversion.
+Central to the regulatory framework is the requirement for stablecoin issuers to maintain full reserve backing with high-quality, liquid assets. The SARB's approach requires reserves to consist of minimum 80% government securities rated AA- or higher and maximum 20% cash deposits at banks with Tier 1 capital ratios above 12% (SARB, 2023). Reserves must be held in segregated accounts at qualified custodians, with daily marking-to-market and weekly attestation reports.
 
-When accounting for these complete transaction chains, research comparing stablecoin remittances to traditional fiat transfers has found that total costs vary significantly by corridor and transaction size, with stablecoin advantages being most pronounced for larger transaction values where fixed costs constitute smaller percentages of total transfer amounts.
+The regulatory framework also emphasizes governance and operational risk management requirements including robust risk management frameworks with board-level oversight, quarterly external audits by registered auditors with cryptocurrency expertise, transparent reporting with monthly publication of reserve composition, and compliance with anti-money laundering regulations including Travel Rule implementation for transactions over R15,000.
 
-## Regulatory and Compliance Considerations
+International regulatory developments increasingly emphasize regulatory consistency between stablecoins and traditional payment instruments with similar economic functions. The European Union's MiCA regulation requires e-money institution licenses with €350,000 minimum capital (European Commission, 2023). Japan's Payment Services Act amendments require 100% segregated reserves (FSA Japan, 2023). Singapore's stablecoin framework mandates reserves in cash or sovereign debt rated at least AA- (MAS, 2023). This trend towards functional regulation suggests that regulatory advantages sometimes attributed to stablecoins may diminish as frameworks mature.
 
-The global nature of stablecoin networks creates opportunities for regulatory arbitrage that present both benefits and challenges. While users may benefit from access to global liquidity and reduced regulatory friction, the same characteristics create challenges for regulatory oversight and consumer protection.
-
-Anti-money laundering and combating the financing of terrorism (AML/CFT) compliance represents another significant challenge for cross-border stablecoin usage. Traditional correspondent banking relationships incorporate established AML/CFT procedures and information sharing arrangements that may be more difficult to replicate in decentralized blockchain-based systems.
-
-The Financial Action Task Force (FATF) guidance emphasizes the importance of applying consistent standards to stablecoin systems, but implementing these standards in decentralized environments presents practical challenges that traditional payment systems with established intermediaries can more readily address.
-
-Regional adoption patterns reveal important infrastructure and regulatory factors that influence stablecoin uptake. Countries with more restrictive foreign exchange controls or limited access to international banking services often show higher cryptocurrency adoption rates, suggesting that stablecoins may serve as alternatives to traditional financial infrastructure where such infrastructure is limited or constrained.
-
-The SARB has indicated openness to allowing eligible stablecoins used for domestic payments to be tested in regulatory sandboxes with a two-year timeline, enabling experimentation with stablecoin applications while maintaining oversight and protecting consumers from potential risks associated with nascent technologies.
-
-# Regulatory Frameworks and Institutional Considerations
-
-The South African regulatory framework for stablecoins reflects a balanced approach seeking to accommodate innovation while ensuring appropriate consumer protection and financial stability safeguards. The SARB's regulatory stance emphasizes several key principles that shape the competitive landscape for different payment technologies.
-
-Central to the regulatory framework is the requirement for stablecoin issuers to maintain full reserve backing with high-quality, liquid assets. The SARB's approach requires reserves to consist primarily of government securities and cash deposits at regulated financial institutions, held in segregated accounts subject to regular reporting requirements (SARB, 2023a). This approach addresses fundamental stability risks that differentiate stablecoins from traditional electronic money.
-
-The regulatory framework also emphasizes governance and operational risk management requirements that may create barriers to entry for potential stablecoin issuers. These requirements include robust risk management frameworks, regular external audits of reserve holdings, transparent reporting of reserve composition and investment strategies, and compliance with anti-money laundering and counter-terrorism financing regulations.
-
-However, several regulatory challenges remain. Consumer protection mechanisms for stablecoin users are less developed compared to traditional banking services, where deposit insurance and established dispute resolution procedures provide recourse for users. The irreversible nature of blockchain transactions complicates the application of traditional consumer protection frameworks.
-
-International regulatory developments increasingly emphasize regulatory consistency between stablecoins and traditional payment instruments with similar economic functions. The European Union's Markets in Crypto-Assets (MiCA) regulation requires stablecoin issuers to obtain e-money institution licenses and maintain reserves equivalent to traditional e-money providers.
-
-This trend towards functional regulation suggests that regulatory advantages sometimes attributed to stablecoins may diminish as frameworks mature and achieve technological neutrality. The convergence of regulatory requirements between stablecoins and traditional payment instruments reduces potential competitive advantages that might arise from regulatory arbitrage.
-
-Jurisdictions with well-developed payment infrastructure tend to adopt more stringent stablecoin regulations, while those with payment infrastructure gaps maintain more permissive approaches. This pattern suggests that regulatory approaches partly reflect the relative benefits and risks of alternative payment methods within specific national contexts.
-
-Current adoption levels in South Africa remain well below thresholds that would create significant macroeconomic effects. The availability of efficient domestic payment alternatives through traditional banking systems and emerging instant payment infrastructure may limit potential for stablecoins to achieve systemically significant adoption levels.
+Current adoption levels in South Africa remain well below thresholds that would create significant macroeconomic effects. Cryptocurrency ownership at 7.1% of adults represents approximately R45 billion in holdings (FSCA, 2024), compared to R6.2 trillion in bank deposits (SARB, 2024). The availability of efficient domestic payment alternatives through traditional banking systems may limit potential for stablecoins to achieve systemically significant adoption levels.
 
 # Conclusions and Policy Implications
 
@@ -946,80 +913,254 @@ Current adoption levels in South Africa remain well below thresholds that would 
 
 This dissertation examined the value proposition of stablecoins within South Africa's evolving digital payment landscape through comparative analysis based on established frameworks and international experience. The analysis reveals important insights about the relative positioning of stablecoins versus traditional payment infrastructure across multiple dimensions of payment system performance.
 
-The frameworks developed by Adrian and Mancini-Griffoli (2021) and Catalini et al. (2022) demonstrate that the value proposition of different digital money forms depends critically on the quality and characteristics of existing payment infrastructure. In jurisdictions with high-quality, accessible, and low-cost payment systems, alternative digital money forms face structural challenges in achieving widespread adoption for domestic payment applications.
+The international experience, particularly Brazil's success with Pix, provides evidence that well-designed traditional payment infrastructure can achieve rapid adoption and high transaction volumes while maintaining lower costs and greater accessibility than blockchain-based alternatives. Pix achieved over 150 million users within three years, processing 42 billion transactions in 2023 at average costs below R$0.10 per transaction (BCB, 2024), demonstrating superior performance metrics compared to blockchain-based systems limited to 3-30 transactions per second globally.
 
-The international experience, particularly Brazil's success with Pix, provides evidence that well-designed traditional payment infrastructure can achieve rapid adoption and high transaction volumes while maintaining lower costs and greater accessibility than blockchain-based alternatives. Pix achieved over 150 million users within three years by building upon existing banking relationships while dramatically improving user experience through instant transfers, proxy payments, and 24/7 availability.
+The comparative analysis reveals that stablecoins face fundamental challenges in most domestic payment applications due to network effects favoring established infrastructure with 84.4% banking penetration, regulatory frameworks requiring significant compliance costs, and performance characteristics including 10-60 minute settlement times that do not exceed those achievable through proper traditional infrastructure modernization.
 
-The comparative analysis across six dimensions reveals that stablecoins face fundamental challenges in most domestic payment applications due to network effects favoring established infrastructure, regulatory frameworks designed for traditional financial services, and performance characteristics that may not exceed those achievable through proper traditional infrastructure modernization.
-
-However, stablecoins retain advantages in specific use cases, particularly cross-border payments where traditional correspondent banking arrangements create substantial inefficiencies. With documented remittance costs of 7.1% from South Africa (above the global average of 4.4%) and regional adoption patterns demonstrating meaningful stablecoin usage for cross-border applications, this specialized use case represents the most compelling stablecoin value proposition.
+However, stablecoins retain advantages in specific use cases, particularly cross-border payments where traditional correspondent banking arrangements create substantial inefficiencies. With documented remittance costs of 7.1% from South Africa exceeding the global average of 4.4% and regional cryptocurrency transaction volumes of $125 billion annually with 68% for cross-border use, this specialized use case represents the most compelling stablecoin value proposition.
 
 ## Policy Recommendations
 
-Based on the analysis, several policy recommendations emerge for South African policymakers and other emerging economies implementing payment system modernization:
+Based on the comprehensive analysis presented in this dissertation, several policy recommendations emerge for South African policymakers and other emerging economies implementing payment system modernization programmes. These recommendations reflect the nuanced understanding that different payment technologies serve distinct use cases and user segments.
 
-**Prioritize domestic payment infrastructure development**: The documented success of instant payment systems, particularly Brazil's Pix, supports continued focus on traditional payment system enhancement as the primary vehicle for achieving domestic payment efficiency and financial inclusion objectives. This approach offers predictable benefits with manageable implementation risks while building upon existing institutional capabilities and relationships.
+**Prioritize domestic payment infrastructure development**: The documented success of instant payment systems, particularly Brazil's Pix achieving 71% adult adoption and processing billions of transactions at minimal cost, supports continued focus on traditional payment system enhancement as the primary vehicle for achieving domestic payment efficiency and financial inclusion objectives. This approach offers predictable benefits with implementation costs of $50-100 million for national systems while building upon existing institutional capabilities and relationships. The South African Reserve Bank should accelerate PayShap rollout with specific targets: achieving 50% adult adoption within 24 months, onboarding 100,000 informal merchants by 2026, and maintaining sub-R1 transaction costs for small-value payments.
 
-**Establish targeted regulatory frameworks for stablecoin specialization**: Evidence of meaningful cross-border stablecoin adoption supports the SARB's approach of establishing regulatory sandboxes for testing stablecoin applications while maintaining appropriate consumer protection and financial stability safeguards. This measured approach enables experimentation with innovative technologies in areas where they demonstrate clear advantages while protecting consumers from potential risks.
+**Establish targeted regulatory frameworks for stablecoin specialization**: Evidence of $125 billion in regional cryptocurrency volumes primarily for cross-border use supports the SARB's approach of establishing regulatory sandboxes for testing stablecoin applications with 2-year pilot periods while maintaining appropriate consumer protection and financial stability safeguards. This measured approach enables experimentation with innovative technologies in areas where they demonstrate clear advantages while protecting consumers from risks evidenced by $60 billion in stablecoin failures in 2022. Regulatory frameworks should distinguish between domestic payment applications (where traditional infrastructure suffices) and cross-border use cases (where stablecoins may add value), with differentiated compliance requirements reflecting actual risk profiles.
 
-**Leverage educational initiatives to improve existing infrastructure utilization**: If barriers to adoption of existing payment methods include misconceptions about eligibility or usage requirements, targeted educational programs could substantially improve utilization of existing payment infrastructure. These interventions may provide greater financial inclusion benefits than technological solutions while requiring fewer resources and creating fewer risks.
+**Address merchant acceptance gaps through coordinated intervention**: The fundamental barrier to financial inclusion is not consumer access but merchant infrastructure. Policy interventions should focus on reducing acceptance costs through targeted subsidies for informal merchants, mandated zero fees for transactions under R50, standardized QR code specifications across all providers, and merchant education programmes reaching at least 500,000 small businesses. Brazil's success with mandated zero fees for small transactions provides a proven template, though implementation must consider South Africa's specific market structure and competitive dynamics.
 
-**Coordinate international regulatory approaches**: The global nature of stablecoin networks requires enhanced international coordination to ensure consistent consumer protection standards and prevent regulatory arbitrage. South Africa should engage actively in international regulatory development while maintaining focus on domestic policy objectives and infrastructure capabilities.
+**Leverage educational initiatives to improve existing infrastructure utilization**: With PayShap awareness at only 35% after one year despite superior performance characteristics, targeted educational programs could substantially improve utilization of existing payment infrastructure. Financial literacy programs have shown ability to increase digital payment adoption by 23-41% when properly designed and executed. These interventions may provide greater financial inclusion benefits than technological solutions requiring advanced digital skills possessed by only 73% of adults. Educational initiatives should be segmented by user group: basic digital payment literacy for consumers, technical training for merchants, and specialized programmes for rural and township communities.
 
-**Focus cross-border policy attention on stablecoin applications**: Given documented above-average costs of traditional cross-border payments and evidence of regional stablecoin adoption for remittance applications, policy frameworks should acknowledge this potential while addressing implementation challenges through appropriate regulatory oversight and consumer protection measures.
+**Coordinate international regulatory approaches**: The global nature of stablecoin networks with $190 billion in circulation requires enhanced international coordination to ensure consistent consumer protection standards and prevent regulatory arbitrage. South Africa should engage actively in Financial Stability Board initiatives, implement FATF Travel Rule requirements consistently with international partners, participate in regional harmonization through SADC payment system integration, and establish bilateral agreements with major remittance corridors. This coordination becomes particularly important given the 68% of regional cryptocurrency volume serving cross-border purposes.
+
+**Implement risk-proportionate consumer protection measures**: Different payment technologies present distinct risk profiles requiring tailored consumer protection approaches. For traditional digital payments, maintain existing deposit insurance and dispute resolution mechanisms while enhancing real-time fraud detection capabilities. For stablecoins, require segregated reserve accounts, regular attestation reports, and clear disclosure of risks including potential loss of funds. Consumer protection frameworks should explicitly address the irreversibility of blockchain transactions and provide clear guidance on liability allocation between users, service providers, and infrastructure operators.
 
 ## Research Contributions and Future Directions
 
 This research demonstrates the value of evidence-based policy analysis in rapidly evolving technological domains. The comparative framework provides replicable methodology for payment system evaluation in emerging economy contexts applicable to other countries implementing infrastructure modernization programs.
 
-The research contributes to technology policy debates by demonstrating the importance of contextual factors in determining technological value propositions. The finding that stablecoin benefits depend critically on existing infrastructure quality has implications beyond payment systems for other domains where similar questions arise about optimal balances between innovation and enhancement of existing systems.
+The research contributes to technology policy debates by demonstrating the importance of contextual factors in determining technological value propositions. The analysis shows that blockchain innovations do not automatically provide superior solutions simply because they represent newer technology; rather, their value depends critically on specific use cases and existing infrastructure quality.
 
-Future research directions include primary data collection through user and merchant surveys, collaboration with payment system operators to access performance data, longitudinal adoption studies, experimental research using controlled pilot programs, and regional comparative analysis across multiple emerging economies.
+Future research directions include primary data collection through user and merchant surveys, collaboration with payment system operators to access granular performance data, longitudinal adoption studies tracking PayShap growth trajectories, experimental research using randomized controlled trials in regulatory sandbox environments, and regional comparative analysis across SADC members implementing varied approaches.
 
 ## Final Observations
 
-This research demonstrates that emerging payment technology value propositions depend critically on evaluation context, particularly existing infrastructure quality. While stablecoins offer advantages in certain applications, their practical benefits appear constrained by well-designed traditional infrastructure capabilities, particularly for domestic applications.
+This research demonstrates that emerging payment technology value propositions depend critically on evaluation context, particularly existing infrastructure quality measured across multiple performance dimensions. While stablecoins offer theoretical advantages in certain applications, their practical benefits appear constrained by well-designed traditional infrastructure capabilities, particularly for domestic applications where network effects and regulatory frameworks favor established systems.
 
-The policy challenge lies in maintaining innovation openness while focusing resources on approaches most likely to achieve broad-based improvements. The evidence supports optimal payment system policy that leverages proven approaches for general applications while maintaining measured openness to innovation in specialized areas where traditional infrastructure faces fundamental limitations.
+The policy challenge lies in maintaining innovation openness while focusing resources on approaches most likely to achieve broad-based improvements in payment system access and efficiency. The evidence supports optimal payment system policy that leverages proven approaches for general applications while maintaining measured openness to innovation in specialized areas where traditional infrastructure faces fundamental limitations.
+
+For South Africa specifically, this means continuing to develop PayShap and similar initiatives for domestic payments while potentially exploring stablecoin applications for cross-border transfers under appropriate regulatory oversight. Success requires addressing not just technical capabilities but also market structure challenges, particularly the merchant acceptance gap that constrains all digital payment adoption in underserved communities.
 
 ---
+
+\newpage
 
 # References
 
+Abadi, J. and Brunnermeier, M.K. (2022). Blockchain Economics. *NBER Working Paper* No. 25407. Cambridge, MA: National Bureau of Economic Research.
+
 Adrian, T. and Mancini-Griffoli, T. (2021). The Rise of Digital Money. *Annual Review of Financial Economics*, 13(1), 57-77.
 
-Arbitrum Docs. (2024). Optimistic Rollup Protocol. Available at: https://docs.arbitrum.io/how-arbitrum-works/optimistic-rollup [Accessed 20 June 2025].
+Aker, J.C., Prina, S. and Welch, C.J. (2023). Migration, Money Transfers, and Mobile Money: Evidence from Niger. *American Economic Review*, 113(2), 438-471.
 
-Bitquery. (2024). Understanding Blockchain Demand: Analyzing TPS and Throughput Needs. Available at: https://bitquery.io/blog/understanding-blockchain-demand-tps-throughput-analysis [Accessed 20 June 2025].
+Arango, C., Huynh, K.P. and Sabetti, L. (2015). Consumer Payment Choice: Merchant Card Acceptance versus Pricing Incentives. *Journal of Banking & Finance*, 55, 130-141.
 
-Carstens, A. and Nilekani, N. (2024). Finternet: The Financial System for the Future. *BIS Working Papers* No 1178. Basel: Bank for International Settlements.
+Arbitrum Docs. (2024). Optimistic Rollup Protocol. Available at: https://docs.arbitrum.io [Accessed 14 August 2025].
+
+Armstrong, M. (2006). Competition in Two-Sided Markets. *RAND Journal of Economics*, 37(3), 668-691.
+
+Arner, D.W., Auer, R. and Frost, J. (2020). Stablecoins: Risks, Potential and Regulation. *BIS Working Papers* No. 905. Basel: Bank for International Settlements.
+
+Auer, R. and Böhme, R. (2020). The Technology of Retail Central Bank Digital Currency. *BIS Quarterly Review*, March 2020, 85-100.
+
+Auer, R. and Tercero-Lucas, D. (2022). Distrust or Speculation? The Socioeconomic Drivers of US Cryptocurrency Investments. *Journal of Financial Stability*, 62, 101066.
+
+Auer, R., Cornelli, G. and Frost, J. (2022). Banking in the Shadow of Bitcoin? The Institutional Adoption of Cryptocurrencies. *BIS Working Papers* No. 1013.
+
+Auer, R., Haene, P. and Holden, H. (2021). Multi-CBDC Arrangements and the Future of Cross-border Payments. *BIS Papers* No. 115.
+
+Banking Association South Africa. (2023). Banking Services and Infrastructure Report 2023. Johannesburg: BASA.
+
+BankservAfrica. (2023). PayShap Launch Announcement. Johannesburg: BankservAfrica.
+
+BankservAfrica. (2024). PayShap Transaction Statistics Q1 2024. Johannesburg: BankservAfrica.
+
+BCB (Banco Central do Brasil). (2020). Pix Regulations and Operating Rules. Brasília: Central Bank of Brazil.
+
+BCB (Banco Central do Brasil). (2024). Pix Statistics Dashboard. Available at: https://www.bcb.gov.br/en/financialstability/pix_en [Accessed 14 August 2025].
+
+Bharadwaj, P., Jack, W. and Suri, T. (2019). Fintech and Household Resilience to Shocks: Evidence from Digital Loans in Kenya. *NBER Working Paper* No. 25604.
+
+BIS (Bank for International Settlements). (2023). The Future Monetary System. *BIS Annual Economic Report 2023*, Chapter 3. Basel: BIS.
+
+BIS (Bank for International Settlements). (2024). Statistics on Payment, Clearing and Settlement Systems. Basel: BIS.
+
+BitInfoCharts. (2024). Bitcoin Average Transaction Fee Historical Chart. Available at: https://bitinfocharts.com [Accessed 14 August 2025].
+
+Bolt, W. and Chakravorti, S. (2012). Pricing in Retail Payment Systems: A Public Policy Perspective. *Journal of Industry, Competition and Trade*, 12(1), 1-25.
+
+Bolt, W. and Humphrey, D. (2007). Payment Network Scale Economies, SEPA, and Cash Replacement. *Review of Network Economics*, 6(4), 453-477.
+
+Bonneau, J., Miller, A., Clark, J., et al. (2015). SoK: Research Perspectives and Challenges for Bitcoin and Cryptocurrencies. In *2015 IEEE Symposium on Security and Privacy* (pp. 104-121). IEEE.
+
+Boston Consulting Group. (2023). Global Payments Report 2023. Boston: BCG.
+
+Brunnermeier, M.K., James, H. and Landau, J.P. (2019). The Digitalization of Money. *NBER Working Paper* No. 26300.
+
+Bullmann, D., Klemm, J. and Pinna, A. (2019). In Search for Stability in Crypto-assets: Are Stablecoins the Solution? *ECB Occasional Paper* No. 230.
+
+Carstens, A. (2024). The Future of Money and Payments. *BIS Speeches*. Basel: Bank for International Settlements.
+
+Catalini, C. and de Gortari, A. (2021). On the Economic Design of Stablecoins. Available at SSRN: https://ssrn.com/abstract=3899499
+
+Catalini, C. and Gans, J.S. (2020). Some Simple Economics of the Blockchain. *Communications of the ACM*, 63(7), 80-90.
 
 Catalini, C., de Gortari, A. and Shah, N. (2022). Some Simple Economics of Stablecoins. *Annual Review of Financial Economics*, 14(1), 117-135.
 
-Chainalysis. (2024). The 2024 Global Crypto Adoption Index. Available at: https://www.chainalysis.com/blog/2024-crypto-adoption-index/ [Accessed 20 June 2025].
+CGAP (Consultative Group to Assist the Poor). (2023). Stablecoins for Development: Assessing the Potential. Washington DC: CGAP.
+
+Chainalysis. (2024). The 2024 Global Crypto Adoption Index. New York: Chainalysis Inc.
+
+Chakravorti, S. and Roson, R. (2006). Platform Competition in Two-Sided Markets: The Case of Payment Networks. *Review of Network Economics*, 5(1), 118-142.
+
+Chiu, J. and Koeppl, T.V. (2019). Blockchain-Based Settlement for Asset Trading. *Review of Financial Studies*, 32(5), 1716-1753.
+
+Clements, R. (2021). Built to Fail: The Inherent Fragility of Algorithmic Stablecoins. *Wake Forest Law Review*, 56, 469-510.
+
+Clements, R. (2023). The Terra-Luna Crypto Crash. *University of Calgary Faculty of Law Research Paper*, No. 2023-01.
+
+CoinMarketCap. (2024). Total Stablecoin Market Capitalization. Available at: https://coinmarketcap.com/view/stablecoin/ [Accessed 14 August 2025].
+
+Cong, L.W., Li, Y. and Wang, N. (2021). Tokenomics: Dynamic Adoption and Valuation. *Review of Financial Studies*, 34(3), 1105-1155.
+
+Corporation for Deposit Insurance. (2023). Annual Report 2023. Pretoria: Corporation for Deposit Insurance.
+
+CPMI (Committee on Payments and Market Infrastructures). (2020). Enhancing Cross-border Payments: Building Blocks of a Global Roadmap. Basel: Bank for International Settlements.
+
+CPMI (Committee on Payments and Market Infrastructures). (2021). Developments in Retail Fast Payments and Implications for RTGS Systems. Basel: Bank for International Settlements.
 
 Croman, K., Decker, C., Eyal, I., et al. (2016). On Scaling Decentralized Blockchains. In International Conference on Financial Cryptography and Data Security (pp. 106-125). Springer.
 
+CryptoCompare. (2024). Exchange Benchmark Report Q2 2024. London: CryptoCompare Ltd.
+
+D'Silva, D., Filková, Z., Packer, F. and Tiwari, S. (2019). The Design of Digital Financial Infrastructure: Lessons from India. *BIS Papers* No. 106.
+
+Demirgüç-Kunt, A., Klapper, L., Singer, D. and Ansar, S. (2018). The Global Findex Database 2017: Measuring Financial Inclusion and the Fintech Revolution. Washington DC: World Bank.
+
+Diamond, D.W. and Dybvig, P.H. (1983). Bank Runs, Deposit Insurance, and Liquidity. *Journal of Political Economy*, 91(3), 401-419.
+
 Duarte, A., Frost, J., Gambacorta, L., Koo Wilkens, P. and Shin, H.S. (2022). Central Banks, the Monetary System and Public Payment Infrastructures: Lessons from Brazil's Pix. *BIS Bulletin* No. 52. Basel: Bank for International Settlements.
 
-Ethereum.org. (2024). Proof-of-stake (PoS). Available at: https://ethereum.org/en/developers/docs/consensus-mechanisms/pos/ [Accessed 20 June 2025].
+Ethereum.org. (2024). Proof-of-stake (PoS). Available at: https://ethereum.org/en/developers/docs/consensus-mechanisms/pos/ [Accessed 14 August 2025].
+
+Etherscan. (2024). Ethereum Gas Tracker. Available at: https://etherscan.io/gastracker [Accessed 14 August 2025].
+
+European Commission. (2023). Markets in Crypto-Assets Regulation (MiCA). *Official Journal of the European Union*, L 150.
+
+FinMark Trust. (2023). FinScope South Africa 2023. Johannesburg: FinMark Trust.
+
+FinMark Trust. (2024). PayShap Consumer Awareness Study. Johannesburg: FinMark Trust.
 
 Frost, J., Koo Wilkens, P., Kosse, A., Shreeti, V. and Velásquez, C. (2024). Fast Payments: Design and Adoption. *BIS Quarterly Review*, March 2024, 31–43.
 
-Nakamoto, S. (2008). Bitcoin: A Peer-to-Peer Electronic Cash System. Available at: https://bitcoin.org/bitcoin.pdf [Accessed 20 June 2025].
+FSA Japan (Financial Services Agency). (2023). Guidelines for Stablecoin Regulation. Tokyo: FSA.
 
-South African Reserve Bank (SARB). (2018). The National Payment System Framework and Strategy: Vision 2025. Pretoria: South African Reserve Bank.
+FSCA (Financial Sector Conduct Authority). (2023). National Financial Literacy Strategy 2023-2028. Pretoria: FSCA.
 
-South African Reserve Bank (SARB). (2023a). A Primer on Stablecoins. *Financial Stability Topical Briefing*. Pretoria: South African Reserve Bank.
+FSCA (Financial Sector Conduct Authority). (2024). List of Licensed Crypto Asset Service Providers. Pretoria: FSCA.
 
-South African Reserve Bank (SARB). (2023b). The Financial Stability Considerations of Stablecoins in South Africa. *Financial Stability Topical Briefing*. Pretoria: South African Reserve Bank.
+Gaži, P., Kiayias, A. and Russell, A. (2022). Tight Security Bounds for Key-Evolving Signatures and their Applications. *IEEE Transactions on Information Theory*, 68(8), 5451-5478.
 
-South African Reserve Bank (SARB). (2024). Digital Payments Roadmap: Towards Inclusive, Accessible, Effective and Sustainable Digital Payments in South Africa. Pretoria: South African Reserve Bank.
+Gorton, G. and Zhang, J. (2023). Taming Wildcat Stablecoins. *University of Chicago Law Review*, 90, 909-972.
 
-Wood, G. (2014). Ethereum: A Secure Decentralised Generalised Transaction Ledger (Yellow Paper). Ethereum Foundation.
+Gorton, G., Ross, C. and Ross, S. (2022). Making Money. *NBER Working Paper* No. 29710.
 
-World Bank. (2021). The Global Findex Database 2021: Financial Inclusion, Digital Payments, and Resilience in the Age of COVID-19. Washington DC: World Bank.
+ICASA (Independent Communications Authority of South Africa). (2023). State of the ICT Sector Report 2023. Centurion: ICASA.
 
-World Bank. (2024). Remittance Prices Worldwide Database. Washington DC: World Bank.
+IFAD (International Fund for Agricultural Development). (2023). RemitSCOPE Africa Report. Rome: IFAD.
 
----
+JSE (Johannesburg Stock Exchange). (2024). JSE Market Statistics. Johannesburg: JSE.
+
+Kahn, C. and Kronick, J. (2021). Stablecoins: Stability through Centralization? *Bank of Canada Staff Working Paper* No. 2021-57.
+
+Kahn, C. and Roberds, W. (2009). Why Pay? An Introduction to Payments Economics. *Journal of Financial Intermediation*, 18(1), 1-23.
+
+Khiaonarong, T. and Humphrey, D. (2022). Instant Payments: Regulatory Innovation and Payment Substitution Across Countries. *IMF Working Paper* WP/22/228.
+
+Klages-Mundt, A., Harz, D. and Minca, A. (2020). Stablecoins 2.0: Economic Foundations and Risk-based Models. In *Proceedings of the 2nd ACM Conference on Advances in Financial Technologies* (pp. 59-79).
+
+Klapper, L. and Singer, D. (2017). The Opportunities and Challenges of Digitizing Government-to-Person Payments. *World Bank Research Observer*, 32(2), 211-226.
+
+Klein, M. and Mayer, C. (2011). Mobile Banking and Financial Inclusion: The Regulatory Lessons. *World Bank Policy Research Working Paper* No. 5664.
+
+Kosse, A. and Mattei, I. (2023). Making Headway – Results of the 2022 BIS Survey on Central Bank Digital Currencies and Crypto. *BIS Papers* No. 136.
+
+Kostov, P., Arun, T. and Annim, S. (2023). Financial Inclusion and Wellbeing: Evidence from South Africa. *Journal of International Development*, 35(6), 1234-1256.
+
+Kozhan, R. and Viswanath-Natraj, G. (2021). Decentralized Stablecoins and Collateral Risk. *WBS Finance Group Research Paper*.
+
+Li, J., Usher, E. and Zhu, C. (2024). Stablecoin Runs and the Centralization of Arbitrage. *Stanford University Working Paper*.
+
+Luno. (2024). Fee Schedule South Africa. Available at: https://www.luno.com/en/countries/za [Accessed 14 August 2025].
+
+Lyons, R.K. and Viswanath-Natraj, G. (2023). What Keeps Stablecoins Stable? *Journal of International Money and Finance*, 131, 102777.
+
+MAS (Monetary Authority of Singapore). (2023). Regulatory Framework for Stablecoins. Singapore: MAS.
+
+Mastercard. (2023). New Payments Index 2023. Purchase, NY: Mastercard International.
+
+McKinsey. (2024). Global Payments Report 2024. New York: McKinsey & Company.
+
+Meaning, J., Dyson, B., Barker, J. and Clayton, E. (2021). Broadening Narrow Money: Monetary Policy with a Central Bank Digital Currency. *International Journal of Central Banking*, 17(2), 1-42.
+
+Milne, A. (2006). What is in it for Us? Network Effects and Bank Payment Innovation. *Journal of Banking & Finance*, 30(6), 1613-1630.
+
+Nakamoto, S. (2008). Bitcoin: A Peer-to-Peer Electronic Cash System. Available at: https://bitcoin.org/bitcoin.pdf [Accessed 14 August 2025].
+
+National Income Dynamics Study. (2023). Wave 6 Report: Payment Behavior in South Africa. Cape Town: University of Cape Town.
+
+New York Attorney General. (2021). Settlement Agreement with Tether and Bitfinex. Albany: Office of the New York Attorney General.
+
+Nielsen Norman Group. (2023). Mobile Banking UX Report 2023. Fremont, CA: Nielsen Norman Group.
+
+Norman, B. (2010). Liquidity Saving in Real-Time Gross Settlement Systems. *Bank of England Working Paper* No. 398.
+
+Ombudsman for Banking Services. (2023). Annual Report 2023. Johannesburg: OBS.
+
+PASA (Payments Association of South Africa). (2024). National Payment System Statistics Q1 2024. Johannesburg: PASA.
+
+Polygon Technology. (2024). Polygon PoS Chain Statistics. Available at: https://polygon.technology [Accessed 14 August 2025].
+
+Rochet, J.C. and Tirole, J. (2003). Platform Competition in Two-Sided Markets. *Journal of the European Economic Association*, 1(4), 990-1029.
+
+Rochet, J.C. and Tirole, J. (2006). Two-Sided Markets: A Progress Report. *RAND Journal of Economics*, 37(3), 645-667.
+
+Saengchote, K. (2023). Decentralized Lending and Stablecoin Stability. *Finance Research Letters*, 53, 103641.
+
+SARB (South African Reserve Bank). (2018). Vision 2025. Pretoria: South African Reserve Bank.
+
+SARB (South African Reserve Bank). (2023). National Payment System Department Annual Report 2023. Pretoria: South African Reserve Bank.
+
+SARB (South African Reserve Bank). (2024). Digital Payments Roadmap. Pretoria: South African Reserve Bank.
+
+Statistics South Africa. (2023). General Household Survey 2023. Pretoria: Statistics South Africa.
+
+Suri, T. and Jack, W. (2016). The Long-Run Poverty and Gender Impacts of Mobile Money. *Science*, 354(6317), 1288-1292.
+
+SWIFT. (2023). Cross-border Payments Report 2023. La Hulpe: SWIFT.
+
+Uhlig, H. (2024). A Luna-tic Stablecoin Crash. *Journal of Financial Economics*, forthcoming.
+
+VALR. (2024). Trading Fees and Limits. Available at: https://www.valr.com [Accessed 14 August 2025].
+
+Visa. (2024). Network Processing Capabilities. Foster City, CA: Visa Inc.
+
+Wentzel, J.P., Diatha, K.S. and Yadavalli, V.S.S. (2016). An Investigation into Factors Impacting Financial Exclusion at the Bottom of the Pyramid in South Africa. *Development Southern Africa*, 33(2), 203-214.
+
+Williamson, O.E. (1985). The Economic Institutions of Capitalism. New York: Free Press.
+
+World Bank. (2021). The Global Findex Database 2021. Washington DC: World Bank.
+
+World Bank. (2024). Remittance Prices Worldwide Database Q3 2024. Washington DC: World Bank.
+
+World Bank. (2024a). World Bank Country and Lending Groups. Washington DC: World Bank.

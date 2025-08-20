@@ -26,3 +26,5 @@ Thumbs.db
 
 # GitHub Pages output (if using _site/)
 _site/
+
+/.quarto/
