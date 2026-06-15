@@ -1,8 +1,8 @@
 ---
 title: "The Value Proposition of Stablecoins in South Africa's Evolving Digital Payment Landscape: A Comparative Analysis"
-subtitle: "ECO5016W - Minor Dissertation in FinTech (Non-unitary option)"
+subtitle: "ECO5016W - Minor Dissertation in FinTech (Non-unitary option: Topic 1 of 2)"
 author: "Cesaire Tobias"
-date: "2025-09-01"
+date: "2026-06-23"
 format:
   pdf:
     date-format: "DD MMMM, YYYY"
@@ -271,7 +271,7 @@ This dissertation examines the value proposition of stablecoins within South Afr
 
 # Introduction
 
-## Research Context and Motivation
+## Research Context and Motivation {#sec-research-context}
 
 Stablecoins have emerged as a prominent category of crypto assets designed to maintain stable value relative to reference currencies or baskets of assets [@adrian2021rise]. Global stablecoin market capitalization exceeded \$190 billion by late 2024, with Tether (USDT) and USD Coin (USDC) accounting for over 90% of market share as of August 2025 [@coinmarketcap2025total]. Unlike traditional cryptocurrencies, stablecoins employ various mechanisms to maintain price stability, including full reserve backing with fiat currencies, over-collateralization with crypto assets, or algorithmic supply adjustments—though the latter approach notably failed with TerraUSD's \$50 billion collapse in May 2022 [@liu2023anatomy]. The emergence of stablecoins reflects broader trends in the digitization of money and payments, driven by technological advances in distributed ledger technology, mobile computing, and cryptographic protocols [@auer2020technology]. Proponents argue that these innovations represent a fundamental advancement in digital payment infrastructure, potentially addressing longstanding inefficiencies in cross-border payments, financial inclusion, and programmable money applications [@catalini2022some; @arner2020stablecoins]. However, whether stablecoins actually address these inefficiencies – particularly when compared to modernized traditional payment systems – remains an empirical question requiring systematic evaluation.
 
@@ -309,7 +309,7 @@ Transaction cost economics provides another lens through which scholars analyze 
 
 ## Digital Payment Modernization in Emerging Economies
 
-The rapid deployment of instant payment systems across emerging economies has generated rich comparative literature examining success factors, adoption patterns, and policy implications. A convergent finding across multiple studies is that successful instant payment implementations share common design principles regardless of geographic or economic context. Analyses by @frost2024fast and The @cpmi2021developments identify critical success factors including mandatory participation by systemically important institutions, 24/7 availability, simplified user interfaces, and appropriate regulatory oversight. These design principles reflect learning from earlier payment system innovations, incorporating lessons from both successful implementations and notable failures. These findings are reinforced by country-specific studies from Brazil [@duarte2022central], India [@dsilva2019design], and Thailand [@khiaonarong2022instant], which document similar patterns despite different institutional contexts. Brazil's Pix system particularly stands out, as documented in Section 1.1.
+The rapid deployment of instant payment systems across emerging economies has generated rich comparative literature examining success factors, adoption patterns, and policy implications. A convergent finding across multiple studies is that successful instant payment implementations share common design principles regardless of geographic or economic context. Analyses by @frost2024fast and The @cpmi2021developments identify critical success factors including mandatory participation by systemically important institutions, 24/7 availability, simplified user interfaces, and appropriate regulatory oversight. These design principles reflect learning from earlier payment system innovations, incorporating lessons from both successful implementations and notable failures. These findings are reinforced by country-specific studies from Brazil [@duarte2022central], India [@dsilva2019design], and Thailand [@khiaonarong2022instant], which document similar patterns despite different institutional contexts. Brazil's Pix system particularly stands out, as documented in @sec-research-context.
 
 The role of regulatory mandates versus market-led adoption generates substantial debate within this literature. While some scholars argue that mandatory participation is essential for overcoming coordination failures [@duarte2022central; @bolt2007payment], others contend that market-based approaches better align incentives and promote innovation [@klein2011mobile; @milne2006what]. The empirical evidence increasingly supports a nuanced view: jurisdictions with mandatory participation achieve faster initial adoption but may sacrifice innovation flexibility, while market-led systems show greater functionality differentiation but risk fragmentation [@kosse2023making]. This debate has direct implications for stablecoin regulation, as policymakers must balance innovation benefits against systemic risk concerns.
 
@@ -344,15 +344,97 @@ Analysis draws on academic literature, central bank publications, international 
 
 \FloatBarrier
 
+# Data
+
+The analysis draws on three categories of evidence. The primary quantitative dataset is the World Bank's Remittance Prices Worldwide (RPW) database [@worldbank2024remittance], which records the total cost of sending a standardised \$200 transfer—comprising both the transfer fee and the foreign-exchange margin (the CC2 measure)—collected through mystery-shopping exercises across major corridors each quarter [@worldbank2024methodology]. This study uses the third-quarter 2024 release, comprising 6,600 priced services across 348 sending-receiving corridors. Financial inclusion and payment-infrastructure indicators are drawn from the World Bank Global Findex Database [@worldbank2025global] and the Bank for International Settlements' CPMI Red Book payment statistics [@bis2025cpmistats]; these provide single published estimates per country rather than micro-level samples and are reported in the relevant comparison tables. Technical performance figures—settlement times, network fees, and throughput—are sourced from network documentation and on-chain measurement services cited at the point of use.
+
+Because the RPW database is the only source with a distribution of underlying observations, it is the focus of formal descriptive analysis. @tbl-descriptive-stats reports corridor-level descriptive statistics for the four sending countries examined and for the full global sample, following the World Bank's average-of-corridor-averages methodology so that the reported means correspond to the values plotted in @fig-remittance-costs. South Africa exhibits both the highest mean cost (7.3%) and the widest dispersion (standard deviation of 4.1 percentage points), underscoring that headline averages conceal substantial corridor-level variation relevant to remittance users.
+
+```{=latex}
+\newpage
+```
+
+```{r}
+#| label: tbl-descriptive-stats
+#| tbl-cap: "Descriptive Statistics: Cross-Border Remittance Costs by Sending Country (Q3 2024)"
+#| tbl-pos: 'H'
+
+desc_file <- "./inst/extdata/rpw_dataset_2024_q3.xlsx"
+
+desc_stats <- tryCatch({
+  raw <- read_excel(desc_file, sheet = "Dataset")
+  cost_col <- if ("cc2 total cost %" %in% names(raw)) "cc2 total cost %" else "cc2_total_cost_%"
+  raw$cost <- suppressWarnings(as.numeric(raw[[cost_col]]))
+  q3 <- raw %>% filter(period == "2024_3Q", !is.na(cost))
+
+  country_row <- function(d, label) {
+    ca <- d %>% group_by(destination_code) %>%
+      summarise(corridor_avg = mean(cost), n_serv = n(), .groups = "drop")
+    data.frame(
+      Country   = label,
+      Services  = sum(ca$n_serv),
+      Corridors = nrow(ca),
+      Mean      = sprintf("%.1f", mean(ca$corridor_avg)),
+      Median    = sprintf("%.1f", median(ca$corridor_avg)),
+      SD        = if (nrow(ca) > 1) sprintf("%.1f", sd(ca$corridor_avg)) else "—",
+      Min       = sprintf("%.1f", min(ca$corridor_avg)),
+      Max       = sprintf("%.1f", max(ca$corridor_avg)),
+      stringsAsFactors = FALSE
+    )
+  }
+
+  rows <- lapply(c("South Africa", "Kenya", "Ghana", "Brazil"),
+                 function(cn) country_row(q3 %>% filter(source_name == cn), cn))
+  glob <- q3 %>% group_by(source_code, destination_code) %>%
+    summarise(corridor_avg = mean(cost), n_serv = n(), .groups = "drop")
+  glob_row <- data.frame(
+    Country = "All sending countries", Services = sum(glob$n_serv), Corridors = nrow(glob),
+    Mean = sprintf("%.1f", mean(glob$corridor_avg)), Median = sprintf("%.1f", median(glob$corridor_avg)),
+    SD = sprintf("%.1f", sd(glob$corridor_avg)), Min = sprintf("%.1f", min(glob$corridor_avg)),
+    Max = sprintf("%.1f", max(glob$corridor_avg)), stringsAsFactors = FALSE
+  )
+  do.call(rbind, c(rows, list(glob_row)))
+}, error = function(e) {
+  data.frame(
+    Country   = c("South Africa", "Kenya", "Ghana", "Brazil", "All sending countries"),
+    Services  = c(301, 89, 7, 13, 6600),
+    Corridors = c(13, 4, 1, 3, 348),
+    Mean      = c("7.3", "6.4", "6.6", "6.7", "4.9"),
+    Median    = c("8.1", "6.4", "6.6", "6.3", "4.2"),
+    SD        = c("4.1", "0.1", "—", "0.7", "4.1"),
+    Min       = c("-5.5", "6.2", "6.6", "6.2", "-5.5"),
+    Max       = c("11.7", "6.5", "6.6", "7.4", "32.9"),
+    stringsAsFactors = FALSE
+  )
+})
+
+flextable(desc_stats) %>%
+  set_header_labels(
+    Country = "Sending country", Services = "Services (n)", Corridors = "Corridors (n)",
+    Mean = "Mean", Median = "Median", SD = "SD", Min = "Min", Max = "Max"
+  ) %>%
+  theme_booktabs() %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  fontsize(size = 11, part = "all") %>%
+  fontsize(size = 10, part = "header") %>%
+  bold(part = "header") %>%
+  align(align = "left", j = 1, part = "all") %>%
+  align(align = "center", j = 2:8, part = "all") %>%
+  width(width = c(1.55, 0.82, 0.88, 0.58, 0.66, 0.43, 0.55, 0.55)) %>%
+  add_footer_lines("All figures are the CC2 total cost (transfer fee plus foreign-exchange margin) as a percentage of a standardised USD 200 transfer, Q3 2024. Statistics are computed across corridor-level averages following the World Bank methodology, so each Mean equals the value plotted in Figure 1. Ghana has a single corridor, so no standard deviation is reported; negative minima reflect promotional rates and negative FX margins recorded in the source data. Source: Author's calculations from the World Bank Remittance Prices Worldwide Database (Q3 2024).") %>%
+  fontsize(size = 9, part = "footer") %>%
+  font(fontname = "Times New Roman", part = "footer")
+```
+
+\FloatBarrier
+
 # Transaction Cost Analysis and Settlement Efficiency
 
 ## Transaction Cost Structures
 
 Transaction costs fundamentally determine payment system viability, particularly for financial inclusion where small-value transactions for daily expenses – such as transportation, utilities, and mobile top-ups – are prevalent in developing economies [@financemagnates2023micropayments; @mckinsey2022payments]. The economic framework developed by @catalini2022some demonstrates that stablecoin cost structures differ from traditional systems – blockchain fees are fixed per transaction regardless of value, creating severe disadvantages for small payments [@bis2018crypto] that comprise the majority of transactions in developing economies [@gsma2024mobilemoney; @worldbank2025global].
 
-## Domestic Transaction Costs
-
-South Africa's domestic payment costs reveal complex fee structures across different payment methods. Cash is the payment method with no direct, third-party processing fee for the consumer at the point of sale, and it avoids the hidden cost-shifting of interchange fees inherent in card payment systems. Digital alternatives impose various charges: ATM withdrawals often combine fixed and variable costs, making small withdrawals expensive, while consumer-facing fees for instant payment services like PayShap are set by participating banks and vary considerably. PayShap fees range from free transfers at TymeBank to percentage-based fees at other institutions, with costs ranging from R1 to R45 depending on transaction size and bank [@businesstech2023payshap]. These flat fee structures create regressive effects where those making the smallest transactions pay the highest percentage costs.
+Within South Africa, these dynamics play out across a complex domestic fee landscape that varies markedly by payment method. Cash is the payment method with no direct, third-party processing fee for the consumer at the point of sale, and it avoids the hidden cost-shifting of interchange fees inherent in card payment systems. Digital alternatives impose various charges: ATM withdrawals often combine fixed and variable costs, making small withdrawals expensive, while consumer-facing fees for instant payment services like PayShap are set by participating banks and vary considerably. PayShap fees range from free transfers at TymeBank to percentage-based fees at other institutions, with costs ranging from R1 to R45 depending on transaction size and bank [@businesstech2023payshap]. These flat fee structures create regressive effects where those making the smallest transactions pay the highest percentage costs.
 
 The two-sided market problem compounds these challenges. While consumers pay nothing for debit card transactions at point-of-sale, merchants face interchange and acquirer fees totaling 1.2-1.5% [@pasa2024national]. This cost structure incentivizes many small and informal merchants to impose minimum transaction requirements or express a preference for cash, effectively excluding small-value digital payments. The FinScope South Africa 2023 survey documented significant reliance on cash in the informal sector, though specific statistics on merchant behavior and transaction patterns require further research [@finmark2024finscope].
 
@@ -362,7 +444,7 @@ Stablecoin domestic transaction costs are particularly prohibitive. Ethereum net
 
 [^7]: South Africans use cash most often as a payment method irrespective of what they buy, as this is a commonly accepted payment method. The average value per payment across all payment methods is R529 [@sarb2023national], implying fees of between R10 and R80 per transaction.
 
-Brazil's mandated approach (detailed in Section 1.1) demonstrates how policy intervention can address these cost barriers. By mandating zero fees for person-to-person transfers and person-to-merchant transactions under R30-equivalent, Pix achieved the rapid adoption documented earlier [@duarte2022central; @bcb2024pix].
+Brazil's mandated approach (detailed in @sec-research-context) demonstrates how policy intervention can address these cost barriers. By mandating zero fees for person-to-person transfers and person-to-merchant transactions under R30-equivalent, Pix achieved the rapid adoption documented earlier [@duarte2022central; @bcb2024pix].
 
 ```{r remittance-data}
 #| echo: false
@@ -727,7 +809,7 @@ ghana_cost <- remittance_data$Q3_2024_Cost_Percent[remittance_data$Country == "G
 
 ## Cross-Border Remittance Costs
 
-While domestic payments favor traditional infrastructure, cross-border transactions present stablecoins' most compelling use case. Remittance cost data from the World Bank's Remittance Prices Worldwide (RPW) database [@worldbank2024remittance] reveals significant inefficiencies in traditional corridors. The RPW methodology captures total transaction costs including both transfer fees and foreign exchange margins, calculated as a percentage of a standardized \$200 USD transfer amount. These costs are collected through mystery shopping exercises where researchers pose as customers across 367 major remittance corridors worldwide [@worldbank2024methodology].
+While domestic payments favor traditional infrastructure, cross-border transactions present stablecoins' most compelling use case. Remittance cost data from the World Bank's Remittance Prices Worldwide (RPW) database [@worldbank2024remittance] reveals significant inefficiencies in traditional corridors. The RPW methodology captures total transaction costs including both transfer fees and foreign exchange margins, calculated as a percentage of a standardized \$200 USD transfer amount. These costs are collected through mystery shopping exercises where researchers pose as customers across major remittance corridors worldwide [@worldbank2024methodology].
 
 \FloatBarrier
 
@@ -743,19 +825,17 @@ ggplot(remittance_data, aes(x = reorder(Country, Q3_2024_Cost_Percent), y = Q3_2
   coord_flip() +
   scale_y_continuous(limits = c(0, 8), expand = c(0, 0)) +
   labs(
-    title = "Cross-Border Remittance Costs by Country",
     subtitle = "Average cost as percentage of transfer amount ($200 USD equivalent)",
     x = "Country",
     y = "Average Cost (%)",
     caption = paste("Source: Author's calculations from World Bank RPW Database Q3 2024",
                    "Methodology: Average of corridor averages following World Bank approach",
-                   paste0("Sample: ", sum(remittance_data$Number_of_Services, na.rm=TRUE), " services across ", 
-                          sum(remittance_data$Number_of_Corridors, na.rm=TRUE), " corridors"),
+                   paste0("Sample: ", remittance_data$Number_of_Services[remittance_data$Country == "Global Average"], " services across ",
+                          remittance_data$Number_of_Corridors[remittance_data$Country == "Global Average"], " corridors"),
                    sep = "\n")
   ) +
   theme_minimal() +
   theme(
-    plot.title = element_text(size = 12, face = "bold"),
     plot.subtitle = element_text(size = 10),
     plot.caption = element_text(size = 8, hjust = 0, lineheight = 1.2),
     panel.grid.major.y = element_blank(),
@@ -766,11 +846,11 @@ ggplot(remittance_data, aes(x = reorder(Country, Q3_2024_Cost_Percent), y = Q3_2
 
 \FloatBarrier
 
-The analysis reveals that South Africa's average remittance costs of `r sa_cost`%, exceed both the global average of `r global_avg`% and the UN Sustainable Development Goal target of 3% by 2030 [@worldbank2024remittance]. Traditional cross-border payments involve 2-3 intermediary banks with 2-5 day settlement times, creating inefficiencies that disproportionately impact the market. Sub-Saharan Africa received \$125 billion in cryptocurrency transaction volume (July 2023-June 2024), with stablecoins representing 40% of this volume, primarily used for cross-border payments and remittances [@chainalysis2024global; @chainalysis2024subsaharan]. Stablecoins can potentially reduce these costs through peer-to-peer transfers that eliminate intermediaries and reduce settlement to 15-60 minutes [@ethereum2024proof; @nakamoto2008bitcoin]. However, complete transaction chains including exchange fees, network costs, and conversion spreads result in total costs of 1-6% depending on transaction size, with meaningful advantages only for transfers exceeding \$1,000 where fixed costs become proportionally smaller [@bis2023future]. The "last-mile" problem persists, as recipients in countries lacking regulated cryptocurrency exchanges face additional conversion costs through informal markets [@auer2021multi].
+The analysis reveals that South Africa's average remittance costs of `r sa_cost`%, exceed both the global average of `r global_avg`% and the UN Sustainable Development Goal target of 3% by 2030 [@worldbank2024remittance]. Traditional cross-border payments involve 2-3 intermediary banks with 2-5 day settlement times, creating inefficiencies that disproportionately impact the market. Sub-Saharan Africa received \$125 billion in cryptocurrency transaction volume (July 2023-June 2024), with stablecoins representing 43% of this volume, primarily used for cross-border payments and remittances [@chainalysis2024global; @chainalysis2024subsaharan]. Stablecoins can potentially reduce these costs through peer-to-peer transfers that eliminate intermediaries and compress settlement from days to seconds or minutes depending on the network [@solana2024confirmation; @ethereum2024proof]. However, complete transaction chains including exchange fees, network costs, and conversion spreads raise total costs: the BIS estimates these at 1-6% depending on transaction size, with meaningful advantages only for transfers exceeding \$1,000 where fixed costs become proportionally smaller [@bis2023future]. The "last-mile" problem persists, as recipients in countries lacking regulated cryptocurrency exchanges face additional conversion costs through informal markets [@auer2021multi].
 
-## Settlement Finality
+## Settlement Finality and Network Performance
 
-Settlement characteristics fundamentally differentiate payment architectures. Traditional instant payment systems like PayShap achieve immediate, irrevocable settlement through central bank infrastructure in under 10 seconds [@nedbankpayshapfaq]. Blockchain systems require substantially longer for practical finality—Bitcoin needs 6 confirmations (\~60 minutes) while Ethereum achieves economic finality[^8] in 12-15 minutes [@ethereum2024proof; @nakamoto2008bitcoin]. This settlement delay may be acceptable for remittances but proves problematic for point-of-sale transactions where immediate finality is expected.
+Settlement characteristics differentiate payment architectures, though the relevant distinction is no longer raw speed. PayShap achieves immediate, irrevocable settlement through central bank infrastructure within seconds [@nedbankpayshapfaq], and modern stablecoin rails have largely closed the earlier speed and cost gap: USDC on a high-throughput network like Solana confirms in under a second and reaches economic finality[^8] in roughly 13 seconds, at a fee near \$0.00025 [@solana2024confirmation; @solana2024fees], compared to 12-15 minutes on a congested Ethereum mainnet [@ethereum2024proof]. The decisive difference is therefore not latency but the *nature* of finality. Central bank systems settle in central bank money, making finality deterministic and irrevocable with full legal certainty; blockchain finality remains probabilistic, very unlikely to reverse, but without the 100% guarantee of real-time gross settlement and with no central party able to reverse erroneous or fraudulent transfers. This is immaterial for many cross-border flows but central to point-of-sale and high-value domestic payments, where deterministic finality and recourse are expected.
 
 [^8]: The point at which reversing a blockchain transaction becomes economically impractical due to the computational cost required
 
@@ -784,12 +864,12 @@ Settlement characteristics fundamentally differentiate payment architectures. Tr
 #| tbl-pos: 'H'
 
 settlement_data <- data.frame(
-  System = c("PayShap/RTGS", "Pix (Brazil)", "USDC (Ethereum)", "Bitcoin"),
-  Finality_Type = c("Immediate", "Immediate", "Economic Finality", "Probabilistic"),
-  Time_to_Finality = c("< 1 second", "< 1 second", "12-15 minutes", "60+ minutes"),
-  Reversibility = c("Irrevocable", "Irrevocable", "Highly unlikely", "Highly unlikely"),
-  Certainty = c("100%", "100%", "99.9%+", "99.9%+"),
-  Infrastructure = c("Central Bank", "Central Bank", "Blockchain", "Blockchain")
+  System = c("PayShap/RTGS", "Pix (Brazil)", "USDC (Solana)"),
+  Finality_Type = c("Immediate", "Immediate", "Economic Finality"),
+  Time_to_Finality = c("< 1 second", "< 1 second", "~13 seconds"),
+  Reversibility = c("Irrevocable", "Irrevocable", "Highly unlikely"),
+  Certainty = c("100%", "100%", "99.9%+"),
+  Infrastructure = c("Central Bank", "Central Bank", "Blockchain")
 )
 
 flextable(settlement_data) %>%
@@ -808,35 +888,29 @@ flextable(settlement_data) %>%
   bold(part = "header") %>%
   align(align = "left", part = "all") %>%
   align(align = "center", j = c(5), part = "all") %>%
-  width(width = c(1.4, 1.2, 1.2, 1.0, 0.8, 1.2)) %>%
-  add_footer_lines("Sources: PayShap/RTGS data from BankservAfrica (2024) and SARB (2024); Pix data from BCB (2024) and Duarte et al. (2022); Ethereum finality from Ethereum Foundation (2024); Bitcoin confirmation requirements from Nakamoto (2008) and Croman et al. (2016).") %>%
+  width(width = c(1.25, 1.05, 1.1, 0.85, 0.72, 1.05)) %>%
+  add_footer_lines("Notes: Settlement finality is the point at which a payment becomes irrevocable. Central bank systems achieve deterministic finality in central bank money; blockchain networks achieve probabilistic (economic) finality. Solana figures reflect current Tower BFT/Proof-of-History consensus. Sources: PayShap/RTGS from BankservAfrica (2024) and SARB (2024); Pix from BCB (2024) and Duarte et al. (2022); Solana confirmation, finality, and fees from Solana Foundation (no date) and Chainspect (no date).") %>%
   fontsize(size = 9, part = "footer") %>%
   font(fontname = "Times New Roman", part = "footer")
 ```
 
 \FloatBarrier
 
-## Network Capacity and Performance
-
-Network capacity represents another constraint differentiating traditional payment systems from blockchain-based systems. Major blockchain networks have limited throughput, with Bitcoin processing 3-7 TPS [@croman2016scaling] and Ethereum handling 12-15 TPS [@ethereum2024proof]. In contrast, traditional payment networks handle billions of transactions annually through centralized infrastructure [@visa2024annualreport]. Blockchain-based stablecoin systems face documented scalability constraints limiting transaction throughput [@croman2016scaling]. Layer-2 solutions[^9] attempt to address these limitations, with Polygon achieving 34-38 transactions per second and Arbitrum processing over 20 transactions per second while maintaining security through fraud-proof mechanisms[^10] [@polygon2025chain]. However, even these enhanced throughputs remain orders of magnitude below traditional payment system capabilities.
-
-[^9]: Secondary frameworks built on top of main blockchains to improve transaction speed and reduce costs while maintaining security through the base layer
-
-[^10]: Security systems where transactions are assumed valid unless proven fraudulent within a challenge period
+Throughput is the other technical dimension on which these architectures are routinely compared, and here too the early gap has narrowed sharply. Early networks were severely throughput-constrained. Bitcoin processes only 3-7 TPS [@croman2016scaling] and Ethereum mainnet 12-15 TPS [@ethereum2024proof], far below the billions of transactions traditional networks handle annually [@visa2024annualreport]. High-throughput chains have since changed this picture: Solana sustains roughly 1,000-4,000 non-vote transactions per second in live operation, with a theoretical ceiling far higher [@chainspect2024solana], a range adequate for national retail payment volumes. Throughput is therefore no longer the binding constraint on stablecoin viability for domestic payments; the decisive limitations (finality, recourse, denomination, and on/off-ramp friction) lie elsewhere, as the preceding sections establish.
 
 # Financial Inclusion and Accessibility Analysis
 
-## Accessibility Requirements and Digital Infrastructure
+## Accessibility and the Two-Sided Market
 
 Financial inclusion represents a primary policy objective for South Africa's payment system modernization efforts [@sarb2018vision]. The World Bank Global Findex Database [@worldbank2025global] indicates that 84% of South African adults have a bank account. However, account ownership alone does not guarantee meaningful financial inclusion, as payment systems operate as two-sided markets requiring both consumer adoption and merchant acceptance infrastructure.
 
-## The Two-Sided Market Challenge
+The effectiveness of any digital payment system therefore depends on solving this two-sided market problem, and South Africa's merchant acceptance infrastructure reveals stark inequalities. The country has approximately 450,000 POS terminals serving a population of 60 million [@bis2025cpmisa], translating to roughly 7.7 terminals per 1,000 people – significantly below the OECD average of 33 terminals per 1,000 people[^9]. More critically, this infrastructure is heavily concentrated in urban areas and formal retail environments [@finmark2024finscope].
 
-The effectiveness of digital payment systems depends on solving the two-sided market problem. South Africa's merchant acceptance infrastructure reveals stark inequalities. The country has approximately 450,000 POS terminals serving a population of 60 million [@bis2025cpmisa], translating to roughly 7.7 terminals per 1,000 people – significantly below the OECD average of 33 terminals per 1,000 people[^11] . More critically, this infrastructure is heavily concentrated in urban areas and formal retail environments [@finmark2024finscope].
+[^9]: Calculated from BIS data [@bis2025cpmistats]
 
-[^11]: Calculated from BIS data [@bis2025cpmistats]
+Research by Mastercard and Genesis Analytics reveals that approximately 90% of South Africa's 1.5 million informal enterprises operate as cash-only businesses, with only 10% accepting card or digital payments [@mastercard2017informal].[^10] Despite rural and township residents using cards for 60% of their transactions at formal retailers, only 4% of transactions at informal retailers are card-based due to limited payment acceptance infrastructure [@mastercard2017informal]. The FinScope MSME South Africa 2024 Survey confirms this pattern, noting that "despite a marked increase in the use of digital financial services, the MSME ecosystem remains largely cash-driven," with 72% of micro-enterprises operating informally [@finmark2024msme].
 
-Research by Mastercard and Genesis Analytics reveals that approximately 90% of South Africa's 1.5 million informal enterprises operate as cash-only businesses, with only 10% accepting card or digital payments [@mastercard2017informal]. Despite rural and township residents using cards for 60% of their transactions at formal retailers, only 4% of transactions at informal retailers are card-based due to limited payment acceptance infrastructure [@mastercard2017informal]. The FinScope MSME South Africa 2024 Survey confirms this pattern, noting that "despite a marked increase in the use of digital financial services, the MSME ecosystem remains largely cash-driven," with 72% of micro-enterprises operating informally [@finmark2024msme].
+[^10]: These Mastercard and Genesis Analytics figures are 2017 estimates that predate PayShap's 2023 merchant rollout; more recent data report higher informal digital-payment acceptance (see @tbl-financial-inclusion).
 
 The cost structure of traditional POS infrastructure creates prohibitive barriers for small merchants. A basic POS terminal costs between R1,500-R3,000 upfront, with monthly rentals of R150-R400 plus transaction fees of 2.75-3.5% [@pasa2024national]. For informal traders with limited daily turnover, these costs reduce the economic appeal of supporting cashless payments. This merchant acceptance gap means that even banked individuals in underserved communities must rely predominantly on cash.
 
@@ -852,13 +926,13 @@ The cost structure of traditional POS infrastructure creates prohibitive barrier
 inclusion_data <- data.frame(
   Metric = c("Account Ownership (%)", 
              "Card Ownership (%)",
-             "Made Digital Payment (%)", 
+             "Made/Received Digital Payment (%)",
              "Merchant Digital Acceptance - Formal (%)",
              "Merchant Digital Acceptance - Informal (%)",
              "POS Terminals per 1,000 people"),
-  South_Africa = c("84.4", "73.2", "72.0", "94", "17", "7.7"),
+  South_Africa = c("85.4", "73.2", "80.8", "94", "17", "7.7"),
   Sub_Saharan_Africa = c("55.0", "23.1", "50.0", "67", "8", "0.9"),
-  Brazil = c("84.0", "59.4", "85.0", "98", "74", "32.4"),
+  Brazil = c("84.0", "59.4", "76.5", "98", "74", "32.4"),
   OECD_Average = c("95.0", "86.3", "93.0", "99", "89", "33.0")
 )
 
@@ -877,8 +951,8 @@ flextable(inclusion_data) %>%
   bold(part = "header") %>%
   align(align = "left", part = "all") %>%
   align(align = "center", j = c(2, 3, 4, 5), part = "all") %>%
-  width(width = c(2.2, 1.0, 1.4, 0.8, 1.0)) %>%
-  add_footer_lines("Sources: Account ownership, card ownership, and digital payment data from World Bank (2021); Merchant acceptance data from FinMark Trust (2023) and PASA (2024); POS terminal data from SARB (2023) and BIS (2024); Brazil comparison data from Duarte et al. (2022).") %>%
+  width(width = c(2.05, 0.92, 1.3, 0.72, 0.92)) %>%
+  add_footer_lines("Sources: Account ownership and made/received digital payment data from the World Bank Global Findex Database 2021; card ownership from World Bank (2021); merchant acceptance data from FinMark Trust (2023), PASA (2024) and, for Brazil, BCB (2024); POS terminal data from SARB (2023) and BIS (2024).") %>%
   fontsize(size = 9, part = "footer") %>%
   font(fontname = "Times New Roman", part = "footer")
 ```
@@ -889,21 +963,19 @@ flextable(inclusion_data) %>%
 
 Recognizing merchant acceptance barriers, various initiatives have attempted to leverage mobile technology to bypass traditional POS infrastructure requirements. PayShap's merchant solution, implemented from 2023, enables QR code payments through existing smartphones, eliminating POS hardware requirements. By May 2024, PayShap had processed 30 million transactions with a value of R19.5 billion, growing to over 1 million transactions per day by November 2024 [@bankservafrica2024payshap]. However, adoption faces challenges including digital literacy requirements for QR code generation and transaction reconciliation, smartphone penetration limitations among informal traders [@icasa2025state], network connectivity issues with limited 4G coverage in rural areas, and trust barriers with many informal merchants preferring cash for its immediacy and tangibility.
 
-The Brazilian experience (Section 1.1) demonstrates how coordinated intervention can achieve rapid adoption. Within three years, 74% of informal merchants accepted Pix payments, compared to only 31% accepting cards [@bcb2024pixreport]. This was achieved through regulatory design promoting low-cost acceptance, simplified onboarding, standardized interoperable QR codes, and extensive education programs reaching 2.1 million small businesses [@bcb2021citizenshipreport].
+The Brazilian experience (@sec-research-context) demonstrates how coordinated intervention can achieve rapid adoption. Within three years, 74% of informal merchants accepted Pix payments, compared to only 31% accepting cards [@bcb2024pixreport]. This was achieved through regulatory design promoting low-cost acceptance, simplified onboarding, standardized interoperable QR codes, and extensive education programs reaching 2.1 million small businesses [@bcb2021citizenshipreport].
 
-## Stablecoins and the Merchant Acceptance Challenge
+## Stablecoins, User Experience and Adoption
 
-Stablecoins face even more severe merchant acceptance challenges than traditional digital payments. Estimates of the market size of cryptocurrency in global e-commerce transactions was less than 1% in 2025 [@statista2025crypto], with South African cryptocurrency ownership estimated at 10-13% of South African adults according to industry surveys [@chainalysis2024global]. The barriers to stablecoin merchant acceptance compound those facing traditional digital payments. Technical complexity requires merchants to understand wallet management, blockchain confirmations, and gas fees—concepts far removed from traditional payment processing. The FinScope South Africa 2023 survey found limited understanding of basic financial concepts among the general population, suggesting that cryptocurrency concepts would be even more challenging [@finmark2024finscope].
+Stablecoins face even more severe merchant acceptance challenges than traditional digital payments. The market size of cryptocurrency in global e-commerce was estimated at less than 1% in 2025 [@statista2025crypto], with South African cryptocurrency ownership estimated at 10-13% of adults according to industry surveys [@chainalysis2024global]. Technical complexity requires merchants to understand wallet management, blockchain confirmations, and gas fees—concepts far removed from traditional payment processing. The FinScope South Africa 2023 survey found limited understanding of basic financial concepts among the general population, suggesting that cryptocurrency concepts would be even more challenging [@finmark2024finscope].
 
 Volatility and conversion risk present additional challenges. Even "stable" coins experience price fluctuations, with USDT/ZAR spreads varying 1.5-3% intraday [@valr2025trading]. Merchants must either hold stablecoins (accepting currency risk) or immediately convert (incurring fees and operational complexity).
 
 Regulatory uncertainty creates further barriers. The Financial Sector Conduct Authority (FSCA) declared crypto assets as financial products in October 2022, requiring licensing for crypto asset service providers. By 2024, the FSCA had issued 248 licenses to crypto firms [@sarb2023national]. However, without clear guidelines on all aspects of tax treatment, AML compliance, and consumer protection for merchants, legal risks remain. Infrastructure requirements for accepting stablecoins include reliable internet connectivity, smartphones or computers, and technical support—infrastructure often absent in communities most needing financial inclusion. The additional requirement for cryptocurrency exchange accounts for fiat conversion creates further barriers.
 
-Limited network effects compound these challenges. With cryptocurrency ownership at 10-13% of South African adults [@chainalysis2024global], merchants see limited economic incentive for adoption, contrasting with card acceptance where 73% consumer ownership creates clear demand [@worldbank2025global].
+Limited network effects compound these challenges: with crypto ownership this low, merchants see little economic incentive to adopt, in contrast to card acceptance, where 73% consumer ownership creates clear demand [@worldbank2025global].
 
-## User Experience and Adoption Patterns
-
-The practical barriers to payment system adoption often involve factors beyond technical capabilities or cost structures. User experience design, customer education, and support systems play crucial roles, with research showing UX factors account for 55% of payment app adoption decisions [@leinonen2011economics]. Traditional payment systems benefit from established customer service frameworks including 24/7 call centers at major banks, dispute resolution mechanisms, and regulatory protections including deposit insurance.
+Beyond acceptance, user experience and recourse shape adoption outcomes. The practical barriers to payment system adoption often involve factors beyond technical capabilities or cost structures. User experience design, customer education, and support systems play crucial roles, with research showing UX factors account for 55% of payment app adoption decisions [@leinonen2011economics]. Traditional payment systems benefit from established customer service frameworks including 24/7 call centers at major banks, dispute resolution mechanisms, and regulatory protections including deposit insurance.
 
 Stablecoin systems typically offer limited customer support and dispute resolution capabilities due to their decentralized nature. Users who experience technical difficulties or make errors may have little recourse for recovering funds, with cumulative losses from user error in Ethereum alone exceeding \$3.4 billion, while total cryptocurrency losses in 2023 from all causes reached approximately \$1.8 billion [@immunefi2023losses]. The educational requirements for effective stablecoin usage may be particularly challenging for populations that financial inclusion policies aim to serve. Understanding concepts such as private key management, blockchain confirmations, and exchange rate risks requires technological sophistication that may exceed basic financial literacy levels [@fsca2025national].
 
@@ -913,21 +985,19 @@ Stablecoin systems typically offer limited customer support and dispute resoluti
 
 Cross-border payments represent perhaps the most compelling use case for stablecoins when compared to traditional payment infrastructure. The structural inefficiencies of conventional correspondent banking systems are well-documented and persistent despite decades of technological advancement. These systems involve an average of 2-3 intermediary banks [@swift2023cross], with each adding processing time, cost, and operational risk. The complexity increases exponentially for payments between countries lacking direct correspondent relationships, sometimes requiring 5-6 intermediaries. The correspondent banking network has experienced significant consolidation, with a 20% decline in relationships since 2011 due to de-risking pressures from enhanced regulatory requirements and compliance costs [@bis2023future]. This consolidation particularly affects developing countries, where the cost-benefit analysis of maintaining correspondent relationships often leads major banks to withdraw services entirely.
 
-Settlement cycles average 2-5 business days with only 63% straight-through processing rates, meaning over one-third of transactions require manual intervention [@mckinsey2024global]. Sub-Saharan Africa remains the most expensive region globally to send money to, with average costs of 7.9% compared to 6.4%[^12] globally [@worldbank2024remittance]. These elevated costs reflect multiple structural factors: limited competition due to de-risking, high compliance costs relative to transaction values, infrastructure limitations requiring manual processing, and foreign exchange spreads in illiquid currency pairs. These costs particularly affect low-income households, with remittances comprising 15-30% of household income for recipient families across the region [@ifad2023remitscope]. The regressive nature of fixed fee components means smaller transfers—which are most common among vulnerable populations—face the highest percentage costs.
+Settlement cycles average 2-5 business days with only 63% straight-through processing rates, meaning over one-third of transactions require manual intervention [@mckinsey2024global]. Sub-Saharan Africa remains the most expensive region globally to send money to, with average costs of 7.9%, well above the global average of `r global_avg`% [@worldbank2024remittance]. These elevated costs reflect multiple structural factors: limited competition due to de-risking, high compliance costs relative to transaction values, infrastructure limitations requiring manual processing, and foreign exchange spreads in illiquid currency pairs. These costs particularly affect low-income households, with remittances comprising 15-30% of household income for recipient families across the region [@ifad2023remitscope]. The regressive nature of fixed fee components means smaller transfers—which are most common among vulnerable populations—face the highest percentage costs.
 
-[^12]: World Bank reported - author's calculation: `r global_avg`%
-
-Regional cryptocurrency adoption patterns demonstrate growing interest in alternative payment methods as users seek to circumvent these traditional system inefficiencies. Research indicates South Africa ranks 30th globally in cryptocurrency adoption, with Sub-Saharan Africa accounting for 2.7% of global cryptocurrency transaction volume between July 2023 and June 2024, representing \$125 billion in on-chain value [@chainalysis2024global]. Cross-border transfers dominate the region's cryptocurrency usage, with the @imf2025stablecoin reporting that 86% of stablecoin flows are cross-border (compared to 14% domestic), while earlier research found 88.5% of African cryptocurrency transactions serve cross-border purposes [@kucoin2022africa]. Stablecoins now represent 43% of the region's total crypto transaction volume [@chainalysis2024subsaharan].
+Regional cryptocurrency adoption patterns demonstrate growing interest in alternative payment methods as users seek to circumvent these traditional system inefficiencies. Research indicates South Africa ranks 30th globally in cryptocurrency adoption, with Sub-Saharan Africa accounting for 2.7% of global cryptocurrency transaction volume between July 2023 and June 2024, representing \$125 billion in on-chain value [@chainalysis2024global]. Cross-border transfers dominate the region's cryptocurrency usage: the @imf2025stablecoin reports that 86% of stablecoin flows are cross-border, consistent with earlier findings of 88.5% for African crypto transactions [@kucoin2022africa]. Stablecoins now represent 43% of the region's total crypto transaction volume [@chainalysis2024subsaharan].
 
 The drivers of cryptocurrency adoption for cross-border payments extend beyond cost considerations. In countries with capital controls, such as Zimbabwe and Nigeria [@rbz2025guidelines; @cbn2024guidelines], cryptocurrencies provide mechanisms to circumvent restrictions, leading to some of the highest grassroots adoption rates in the region as users seek alternatives to official channels [@chainalysis2024global]. Additionally, the speed advantage—settlement in minutes rather than days—provides crucial benefits for emergency remittances or time-sensitive business payments.
 
 ## Stablecoin Advantages and Implementation Challenges
 
-The empirical cost analysis presented earlier demonstrates that stablecoins could offer meaningful advantages for cross-border payments, though these benefits are constrained by practical implementation challenges. With traditional remittance costs from South Africa averaging 7.1% compared to the global average of 6.4%, the potential for stablecoin costs of 1-6% depending on transaction size represents a tangible improvement—particularly given that South Africa's costs exceed the UN Sustainable Development Goal target of 3% by more than double [@worldbank2024remittance].
+The empirical cost analysis presented earlier demonstrates that stablecoins could offer meaningful advantages for cross-border payments, though these benefits are constrained by practical implementation challenges. With traditional remittance costs from South Africa averaging `r sa_cost`% compared to the global average of `r global_avg`%, the potential for stablecoin costs the BIS estimates at 1-6% depending on transaction size [@bis2023future] represents a tangible improvement—particularly given that South Africa's costs exceed the UN Sustainable Development Goal target of 3% by more than double [@worldbank2024remittance].
 
-Stablecoins achieve these potential cost reductions through direct peer-to-peer transfers that bypass traditional correspondent banking networks, eliminating the 2-3 intermediary banks typical in conventional systems [@auer2021multi]. Settlement times compress from 2-5 days to minutes depending on the blockchain used, with Bitcoin requiring approximately 60 minutes for secure confirmation and Ethereum achieving economic finality in 12-15 minutes [@ethereum2024proof; @nakamoto2008bitcoin].
+Stablecoins achieve these potential cost reductions through direct peer-to-peer transfers that bypass traditional correspondent banking networks, eliminating the 2-3 intermediary banks typical in conventional systems [@auer2021multi]. Settlement times compress from 2-5 days to seconds or minutes depending on the network used: a high-throughput chain such as Solana confirms in under a second and finalises in roughly 13 seconds [@solana2024confirmation], while even congested networks like Ethereum mainnet settle within 12-15 minutes [@ethereum2024proof]. In the cross-border context this speed advantage is unambiguously valuable, since the relevant benchmark is multi-day correspondent banking rather than a domestic instant-payment system.
 
-However, realizing these theoretical advantages requires navigating significant practical challenges. As documented in the transaction cost analysis, complete stablecoin transaction chains involve multiple cost components: on-ramp costs of 0.5-2% in trading fees plus 1-3% spreads on ZAR pairs [@luno2025fee; @valr2025trading], network fees ranging from minimal amounts on Layer-2 solutions like Polygon to potentially exceeding \$50 on Ethereum during congestion [@olaoluwa2023networkfees; @pierce2025polygonfees], and off-ramp costs that vary significantly by jurisdiction. The analysis showed total costs of 2-7% for efficient routes, which while potentially lower than the 7.1% average for traditional South African remittances, still exceed best-practice traditional corridors and far exceed the SDG target.
+However, realizing these advantages requires navigating the complete-transaction-chain costs documented earlier—on-ramp trading fees and ZAR spreads [@luno2025fee; @valr2025trading], network fees that spike during congestion [@olaoluwa2023networkfees; @pierce2025polygonfees], and jurisdiction-dependent off-ramp costs. Built up from current exchange and network fee schedules, these components total 2-7% for efficient routes—a bottom-up figure broadly consistent with the BIS estimate. While potentially below the `r sa_cost`% average for traditional South African remittances, these costs still exceed best-practice corridors and far exceed the SDG target.
 
 The cost advantage becomes clearer for larger transactions where fixed components become proportionally smaller. For transfers exceeding \$1,000, stablecoin costs can drop to 1-3% as fixed network fees become negligible percentages of the total [@bis2023future]. This creates a regressive structure where stablecoins serve higher-value transfers better than the small-value remittances most critical for low-income households. Additionally, off-ramp challenges persist in recipient countries, with approximately 57 countries where cryptocurrency is legal having no comprehensive exchange regulations [@coingecko2023legal], forcing recipients to use informal markets with additional costs and risks.
 
@@ -947,19 +1017,19 @@ South Africa's approach currently emphasizes CASP regulation rather than stablec
 
 ## Summary of Research Findings
 
-This dissertation examined the value proposition of stablecoins within South Africa's evolving digital payment landscape through comparative analysis based on established frameworks and international experience. The analysis reveals important insights about the relative positioning of stablecoins versus traditional payment infrastructure across multiple dimensions of payment system performance. The international experience, particularly Brazil's Pix system (as detailed in Section 1.1), provides evidence that well-designed traditional payment infrastructure can achieve the rapid adoption and high transaction volumes documented earlier while maintaining lower costs and greater accessibility than blockchain-based alternatives, with blockchain systems limited to 3-30 transactions per second globally.
+This dissertation examined the value proposition of stablecoins within South Africa's evolving digital payment landscape through comparative analysis based on established frameworks and international experience. The analysis reveals important insights about the relative positioning of stablecoins versus traditional payment infrastructure across multiple dimensions of payment system performance. The international experience, particularly Brazil's Pix system (as detailed in @sec-research-context), provides evidence that well-designed traditional payment infrastructure can achieve the rapid adoption and high transaction volumes documented earlier while maintaining lower costs, greater accessibility, and deterministic settlement finality that blockchain-based alternatives cannot match - even where modern high-throughput chains such as Solana have closed the earlier gaps in transaction speed, fees, and throughput.
 
-The comparative analysis reveals that stablecoins face fundamental challenges in most domestic payment applications due to network effects favoring established infrastructure with 84.4% banking penetration, regulatory frameworks requiring significant compliance costs, and performance characteristics including 15-60 minute settlement times that do not exceed those achievable through proper traditional infrastructure modernization. However, stablecoins retain advantages in specific use cases, particularly cross-border payments where traditional correspondent banking arrangements create substantial inefficiencies. With documented remittance costs of 7.9% from Sub-Saharan Africa exceeding the global average of 6.4% and regional cryptocurrency transaction volumes of \$125 billion annually with 86% of stablecoin flows serving cross-border purposes, this specialized use case represents the most compelling stablecoin value proposition.
+The comparative analysis reveals that stablecoins face fundamental challenges in most domestic payment applications due to network effects favoring established infrastructure with 84% banking penetration, regulatory frameworks requiring significant compliance costs, and performance characteristics, notably probabilistic rather than deterministic settlement finality and limited consumer recourse, that do not exceed those achievable through proper traditional infrastructure modernization - even where modern chains now match traditional rails on raw speed and cost. However, stablecoins retain advantages in specific use cases, particularly cross-border payments where traditional correspondent banking arrangements create substantial inefficiencies. With documented remittance costs of 7.9% from Sub-Saharan Africa exceeding the global average of `r global_avg`% and regional cryptocurrency transaction volumes of \$125 billion annually with 86% of stablecoin flows serving cross-border purposes, this specialized use case represents the most compelling stablecoin value proposition.
 
 ## Policy Recommendations
 
 Based on the comprehensive analysis presented in this dissertation, several policy recommendations emerge for South African policymakers and other emerging economies implementing payment system modernization programmes. These recommendations reflect the nuanced understanding that different payment technologies serve distinct use cases and user segments.
 
-**Prioritize domestic payment infrastructure development.** The documented success of instant payment systems, particularly Brazil's Pix (Section 1.1), supports continued focus on traditional payment system enhancement as the primary vehicle for achieving domestic payment efficiency and financial inclusion objectives. This approach offers predictable benefits with implementation costs that are manageable for national systems while building upon existing institutional capabilities and relationships. The South African Reserve Bank should accelerate PayShap rollout with specific targets: achieving significant adult adoption within 24 months, onboarding informal merchants progressively, and maintaining low transaction costs for small-value payments.
+**Prioritize domestic payment infrastructure development.** The documented success of instant payment systems, particularly Brazil's Pix (@sec-research-context), supports continued focus on traditional payment system enhancement as the primary vehicle for achieving domestic payment efficiency and financial inclusion objectives. This approach offers predictable benefits with implementation costs that are manageable for national systems while building upon existing institutional capabilities and relationships. The South African Reserve Bank should accelerate PayShap rollout with specific targets: achieving significant adult adoption within 24 months, onboarding informal merchants progressively, and maintaining low transaction costs for small-value payments.
 
 **Establish targeted regulatory frameworks for stablecoin specialization.** Evidence of \$125 billion in regional cryptocurrency volumes primarily for cross-border use supports the SARB's approach of establishing regulatory frameworks for testing stablecoin applications while maintaining appropriate consumer protection and financial stability safeguards. This measured approach enables experimentation with innovative technologies in areas where they demonstrate clear advantages while protecting consumers from risks evidenced by TerraUSD's \$50 billion collapse in May 2022. Regulatory frameworks should distinguish between domestic payment applications (where traditional infrastructure suffices) and cross-border use cases (where stablecoins may add value), with differentiated compliance requirements reflecting actual risk profiles.
 
-**Address merchant acceptance gaps through coordinated intervention.** The fundamental barrier to financial inclusion is not consumer access but merchant infrastructure. Policy interventions should focus on reducing acceptance costs through targeted subsidies for informal merchants, exploring mandated reduced fees for small transactions, standardized QR code specifications across all providers, and merchant education programmes reaching small businesses. Brazil's mandated zero fees approach (Section 1.1) provides a proven template, though implementation must consider South Africa's specific market structure.
+**Address merchant acceptance gaps through coordinated intervention.** The fundamental barrier to financial inclusion is not consumer access but merchant infrastructure. Policy interventions should focus on reducing acceptance costs through targeted subsidies for informal merchants, exploring mandated reduced fees for small transactions, standardized QR code specifications across all providers, and merchant education programmes reaching small businesses. Brazil's mandated zero fees approach (@sec-research-context) provides a proven template, though implementation must consider South Africa's specific market structure.
 
 **Leverage educational initiatives to improve existing infrastructure utilization.** With PayShap processing over 1 million transactions daily by late 2024, continued educational programs could substantially improve utilization of existing payment infrastructure. Financial literacy programs have shown ability to increase digital payment adoption when properly designed and executed. These interventions may provide greater financial inclusion benefits than technological solutions requiring advanced digital skills. Educational initiatives should be segmented by user group: basic digital payment literacy for consumers, technical training for merchants, and specialized programmes for rural and township communities.
 
@@ -967,15 +1037,13 @@ Based on the comprehensive analysis presented in this dissertation, several poli
 
 **Implement risk-proportionate consumer protection measures.** Different payment technologies present distinct risk profiles requiring tailored consumer protection approaches. For traditional digital payments, maintain existing deposit insurance and dispute resolution mechanisms while enhancing real-time fraud detection capabilities. For stablecoins, require segregated reserve accounts, regular attestation reports, and clear disclosure of risks including potential loss of funds. Consumer protection frameworks should explicitly address the irreversibility of blockchain transactions and provide clear guidance on liability allocation between users, service providers, and infrastructure operators.
 
-## Research Contributions and Future Directions
+## Research Contributions and Concluding Remarks
 
 This research demonstrates the value of evidence-based policy analysis in rapidly evolving technological domains. The comparative framework provides replicable methodology for payment system evaluation in emerging economy contexts applicable to other countries implementing infrastructure modernization programs. The research contributes to technology policy debates by demonstrating the importance of contextual factors in determining technological value propositions. The analysis shows that blockchain innovations do not automatically provide superior solutions simply because they represent newer technology; rather, their value depends critically on specific use cases and existing infrastructure quality.
 
 Future research directions include primary data collection through user and merchant surveys, collaboration with payment system operators to access granular performance data, longitudinal adoption studies tracking PayShap growth trajectories, experimental research using randomized controlled trials in regulatory sandbox environments, and regional comparative analysis across SADC members implementing varied approaches.
 
-## Final Observations
-
-This research demonstrates that emerging payment technology value propositions depend critically on evaluation context, particularly existing infrastructure quality measured across multiple performance dimensions. While stablecoins offer theoretical advantages in certain applications, their practical benefits appear constrained by well-designed traditional infrastructure capabilities, particularly for domestic applications where network effects and regulatory frameworks favor established systems. The policy challenge lies in maintaining innovation openness while focusing resources on approaches most likely to achieve broad-based improvements in payment system access and efficiency.
+The broader lesson is that emerging payment technology value propositions depend critically on evaluation context, particularly existing infrastructure quality measured across multiple performance dimensions. While stablecoins offer theoretical advantages in certain applications, their practical benefits appear constrained by well-designed traditional infrastructure capabilities, particularly for domestic applications where network effects and regulatory frameworks favor established systems. The policy challenge lies in maintaining innovation openness while focusing resources on approaches most likely to achieve broad-based improvements in payment system access and efficiency.
 
 The evidence supports optimal payment system policy that leverages proven approaches for general applications while maintaining measured openness to innovation in specialized areas where traditional infrastructure faces fundamental limitations. For South Africa specifically, this means continuing to develop PayShap and similar initiatives for domestic payments while potentially exploring stablecoin applications for cross-border transfers under appropriate regulatory oversight. Success requires addressing not just technical capabilities but also market structure challenges, particularly the merchant acceptance gap that constrains all digital payment adoption in underserved communities.
 
